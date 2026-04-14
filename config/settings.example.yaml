@@ -1,0 +1,79 @@
+# Copy to settings.yaml and fill in your keys
+
+apis:
+  # Google Maps scraping — https://apify.com or https://serpapi.com
+  apify_token: ""
+  serpapi_key: ""
+
+  # Tech stack lookups — https://builtwith.com/api
+  builtwith_key: ""
+
+  # Review scraping — https://outscraper.com
+  outscraper_key: ""
+
+  # Contact enrichment — https://apollo.io or https://hunter.io
+  apollo_key: ""
+  hunter_key: ""
+
+  # Message generation — https://console.anthropic.com
+  anthropic_key: ""
+
+  # Email delivery — https://instantly.ai
+  instantly_key: ""
+
+pipeline:
+  # Max leads to process per run
+  batch_size: 100
+  # Min score (0-100) to qualify for outreach
+  score_threshold: 55
+  # Max emails per day across all domains
+  daily_send_limit: 50
+
+scoring:
+  # Default weights (override per vertical in config/verticals/)
+  weights:
+    website_outdated: 20       # Missing modern web features
+    no_crm_detected: 15        # No CRM tracking scripts found
+    no_scheduling_tool: 10     # No online booking/scheduling
+    no_chat_widget: 5          # No live chat or chatbot
+    manual_job_postings: 25    # Hiring for roles that signal manual processes
+    negative_reviews_ops: 15   # Customer complaints about responsiveness/ops
+    business_age: 5            # Older businesses score higher
+    employee_count: 5          # Sweet spot: 10-200 employees
+
+  # Job posting keywords that signal manual processes
+  manual_process_keywords:
+    - "data entry"
+    - "filing"
+    - "appointment scheduling"
+    - "receptionist"
+    - "administrative assistant"
+    - "manual"
+    - "paper records"
+    - "phone calls"
+    - "spreadsheet"
+    - "microsoft access"
+    - "quickbooks desktop"
+
+  # Review keywords that signal operational problems
+  ops_complaint_keywords:
+    - "never called back"
+    - "lost my"
+    - "couldn't get an appointment"
+    - "no response"
+    - "disorganized"
+    - "kept me waiting"
+    - "wrong information"
+    - "lost paperwork"
+    - "hard to reach"
+    - "voicemail full"
+
+outreach:
+  # Claude model for message generation
+  model: "claude-sonnet-4-20250514"
+  # Max tokens per generated message
+  max_tokens: 500
+  # Sequence: number of follow-ups after initial email
+  followup_count: 2
+  # Days between follow-ups
+  followup_interval_days: 3

@@ -1,0 +1,39 @@
+# HVAC / Plumbing / Electrical — Home Services vertical
+name: hvac
+
+# Weight overrides (reviews and scheduling matter more here)
+weights:
+  website_outdated: 15
+  no_crm_detected: 15
+  no_scheduling_tool: 20  # Huge for service businesses
+  no_chat_widget: 5
+  manual_job_postings: 20
+  negative_reviews_ops: 20  # Customers vocal about missed appointments
+  business_age: 5
+
+# Additional keywords for this vertical
+extra_manual_keywords:
+  - "dispatch"
+  - "call center"
+  - "answering service"
+  - "work orders"
+  - "service tickets"
+  - "fleet management"
+
+extra_complaint_keywords:
+  - "no show"
+  - "missed appointment"
+  - "wrong time"
+  - "waited all day"
+  - "couldn't schedule"
+  - "took weeks"
+  - "never showed up"
+  - "had to call multiple times"
+
+# Google Maps search queries for this vertical
+search_queries:
+  - "hvac companies"
+  - "plumbing companies"
+  - "electrician"
+  - "heating and cooling"
+  - "AC repair"

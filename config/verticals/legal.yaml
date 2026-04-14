@@ -1,0 +1,39 @@
+# Legal / Law Firms vertical
+name: legal
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 20  # Lead management is critical for law firms
+  no_scheduling_tool: 15
+  no_chat_widget: 10
+  manual_job_postings: 20
+  negative_reviews_ops: 15
+  business_age: 5
+
+extra_manual_keywords:
+  - "paralegal"
+  - "legal secretary"
+  - "document review"
+  - "case management"
+  - "client intake"
+  - "filing clerk"
+  - "legal assistant"
+  - "dictation"
+  - "transcription"
+
+extra_complaint_keywords:
+  - "never heard back"
+  - "slow response"
+  - "lost documents"
+  - "disorganized"
+  - "missed deadline"
+  - "billing surprise"
+  - "couldn't reach"
+  - "no updates"
+  - "left in the dark"
+
+search_queries:
+  - "law firm"
+  - "attorney"
+  - "lawyer"
+  - "legal services"

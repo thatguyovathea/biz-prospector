@@ -1,0 +1,38 @@
+# Property Management vertical
+name: property_management
+
+weights:
+  website_outdated: 10
+  no_crm_detected: 20
+  no_scheduling_tool: 10
+  no_chat_widget: 15  # Tenants expect instant communication
+  manual_job_postings: 20
+  negative_reviews_ops: 20  # Tenant complaints are extremely telling
+  business_age: 5
+
+extra_manual_keywords:
+  - "maintenance coordinator"
+  - "leasing agent"
+  - "property administrator"
+  - "work order"
+  - "tenant relations"
+  - "rent collection"
+  - "move-in coordinator"
+
+extra_complaint_keywords:
+  - "maintenance request"
+  - "work order ignored"
+  - "never fixed"
+  - "can't reach"
+  - "no one answers"
+  - "months to repair"
+  - "sent multiple emails"
+  - "emergency line"
+  - "lost deposit"
+  - "lease renewal"
+
+search_queries:
+  - "property management company"
+  - "property manager"
+  - "apartment management"
+  - "rental management"

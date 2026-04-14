@@ -1,0 +1,39 @@
+# Dental / Medical Practices vertical
+name: dental
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 10
+  no_scheduling_tool: 25  # Online booking is expected, missing = big gap
+  no_chat_widget: 10
+  manual_job_postings: 15
+  negative_reviews_ops: 20
+  business_age: 5
+
+extra_manual_keywords:
+  - "front desk"
+  - "patient intake"
+  - "insurance verification"
+  - "medical records"
+  - "appointment confirmation"
+  - "billing coordinator"
+  - "claims processing"
+
+extra_complaint_keywords:
+  - "long wait"
+  - "waiting room"
+  - "appointment time"
+  - "billing issue"
+  - "insurance"
+  - "couldn't get in"
+  - "weeks out"
+  - "front desk rude"
+  - "lost records"
+  - "wrong chart"
+
+search_queries:
+  - "dental office"
+  - "dentist"
+  - "dental clinic"
+  - "family dentistry"
+  - "orthodontist"
