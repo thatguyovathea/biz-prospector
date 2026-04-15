@@ -39,7 +39,7 @@ scoring:
     manual_job_postings: 25    # Hiring for roles that signal manual processes
     negative_reviews_ops: 15   # Customer complaints about responsiveness/ops
     business_age: 5            # Older businesses score higher
-    employee_count: 5          # Sweet spot: 10-200 employees
+    employee_title_signals: 5  # Manual vs tech roles in employee titles
 
   # Job posting keywords that signal manual processes
   manual_process_keywords:
@@ -67,6 +67,39 @@ scoring:
     - "lost paperwork"
     - "hard to reach"
     - "voicemail full"
+
+  # Employee title keywords that signal manual processes
+  manual_role_keywords:
+    - "data entry"
+    - "filing"
+    - "receptionist"
+    - "bookkeeper"
+    - "administrative assistant"
+    - "office clerk"
+    - "records clerk"
+    - "dispatcher"
+    - "scheduling coordinator"
+    - "front desk"
+    - "payroll clerk"
+    - "accounts receivable"
+    - "accounts payable"
+
+  # Employee title keywords that signal tech maturity
+  tech_role_keywords:
+    - "it manager"
+    - "it director"
+    - "chief technology"
+    - "cto"
+    - "crm"
+    - "systems administrator"
+    - "database administrator"
+    - "software engineer"
+    - "developer"
+    - "devops"
+    - "data analyst"
+    - "digital marketing"
+    - "web developer"
+    - "information technology"
 
 outreach:
   # Claude model for message generation

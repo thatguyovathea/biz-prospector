@@ -6,6 +6,9 @@ All notable changes to this project are documented here.
 
 ### Added
 - Solo-orchestrator framework adoption (phase-gating, CI pipeline, security scanning)
+- Employee title analysis via Apollo People Search (free endpoint) for scoring
+- Business age scoring from Apollo organization data (founded year)
+- LinkedIn URL capture for contacts
 
 ## [0.1.0] — 2026-04-14 (Retroactive)
 

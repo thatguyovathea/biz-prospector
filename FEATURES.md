@@ -11,6 +11,7 @@ Living reference of all implemented features.
 - **Website auditing** — HTML-based detection of CRM, chat widgets, scheduling tools, SSL, mobile responsiveness
 - **BuiltWith API integration** — Tech stack detection via BuiltWith Domain API v22, merged with HTML detection
 - **Contact enrichment** — Apollo (primary) → Hunter (fallback) waterfall, email verification, title-priority ranking
+- **Employee title analysis** — Apollo People Search fetches employee rosters, classifies titles as manual-process or tech-maturity signals, feeds into scoring
 - **Async concurrent enrichment** — Semaphore-based concurrency with per-service rate limiting
 
 ## Scoring
