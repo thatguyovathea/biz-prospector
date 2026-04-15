@@ -333,3 +333,81 @@ class TestRunNotify:
             ])
         assert result.exit_code == 0
         mock_send.assert_not_called()
+
+
+class TestReEnrichCommand:
+    def test_re_enriches_stale_leads(self, runner, sample_settings, tmp_path):
+        from datetime import datetime, timezone, timedelta
+        old_date = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+        leads = [
+            make_lead(id="stale1", score=60.0, enriched_at=old_date).model_dump(mode="json"),
+        ]
+        scored_dir = tmp_path / "scored"
+        scored_dir.mkdir()
+        (scored_dir / "test_scored.json").write_text(json.dumps(leads))
+
+        sample_settings["schedule"] = {"re_enrich": {"max_age_days": 30}}
+
+        mock_enriched = [make_lead(id="stale1", score=65.0)]
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.run_async_enrichment", return_value=mock_enriched), \
+             patch("src.pipeline.score_leads", return_value=mock_enriched), \
+             patch("src.pipeline.send_run_summary"), \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, ["re-enrich"])
+        assert result.exit_code == 0
+
+    def test_skips_fresh_leads(self, runner, sample_settings, tmp_path):
+        from datetime import datetime, timezone
+        fresh_date = datetime.now(timezone.utc).isoformat()
+        leads = [
+            make_lead(id="fresh1", score=60.0, enriched_at=fresh_date).model_dump(mode="json"),
+        ]
+        scored_dir = tmp_path / "scored"
+        scored_dir.mkdir()
+        (scored_dir / "test_scored.json").write_text(json.dumps(leads))
+
+        sample_settings["schedule"] = {"re_enrich": {"max_age_days": 30}}
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, ["re-enrich"])
+        assert result.exit_code == 0
+        assert "No stale leads" in result.output
+
+    def test_re_enrich_with_notify(self, runner, sample_settings, tmp_path):
+        from datetime import datetime, timezone, timedelta
+        old_date = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+        leads = [
+            make_lead(id="s1", score=60.0, enriched_at=old_date).model_dump(mode="json"),
+        ]
+        scored_dir = tmp_path / "scored"
+        scored_dir.mkdir()
+        (scored_dir / "test_scored.json").write_text(json.dumps(leads))
+
+        sample_settings["schedule"] = {
+            "re_enrich": {"max_age_days": 30},
+            "summary_email": {"enabled": True, "to": "test@test.com",
+                              "smtp_user": "u", "smtp_password": "p"},
+        }
+        mock_enriched = [make_lead(id="s1", score=65.0)]
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.run_async_enrichment", return_value=mock_enriched), \
+             patch("src.pipeline.score_leads", return_value=mock_enriched), \
+             patch("src.pipeline.send_run_summary") as mock_send, \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, ["re-enrich", "--notify"])
+        assert result.exit_code == 0
+        mock_send.assert_called_once()
+
+    def test_re_enrich_empty_scored_dir(self, runner, sample_settings, tmp_path):
+        scored_dir = tmp_path / "scored"
+        scored_dir.mkdir()
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, ["re-enrich"])
+        assert result.exit_code == 0
+        assert "No stale leads" in result.output or "No scored" in result.output

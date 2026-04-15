@@ -319,5 +319,75 @@ def stats():
         console.print(f"  {stage}: {count} leads processed")
 
 
+@cli.command(name="re-enrich")
+@click.option("--max-age", default=None, type=int, help="Override max_age_days from config")
+@click.option("--notify", is_flag=True, help="Send summary email after completion")
+def re_enrich(max_age: int | None, notify: bool):
+    """Re-enrich and re-score stale leads."""
+    settings = load_settings()
+    max_age_days = max_age or settings.get("schedule", {}).get(
+        "re_enrich", {}
+    ).get("max_age_days", 30)
+
+    scored_dir = DATA_DIR / "scored"
+    if not scored_dir.exists():
+        console.print("[yellow]No scored leads directory found.[/]")
+        return
+
+    # Load all scored leads grouped by source file
+    from datetime import timezone, timedelta
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+    stale_by_file: dict[Path, list[Lead]] = {}
+
+    for json_file in sorted(scored_dir.glob("*.json")):
+        leads = _load_leads(str(json_file))
+        stale = []
+        for lead in leads:
+            if lead.enriched_at:
+                if isinstance(lead.enriched_at, str):
+                    enriched_dt = datetime.fromisoformat(lead.enriched_at)
+                else:
+                    enriched_dt = lead.enriched_at
+                if enriched_dt < cutoff:
+                    stale.append(lead)
+            else:
+                stale.append(lead)
+        if stale:
+            stale_by_file[json_file] = stale
+
+    total_stale = sum(len(v) for v in stale_by_file.values())
+    if total_stale == 0:
+        console.print("[yellow]No stale leads to re-enrich.[/]")
+        return
+
+    console.print(f"[bold]Re-enriching {total_stale} stale leads from {len(stale_by_file)} files[/]")
+
+    all_refreshed = []
+    for json_file, stale_leads in stale_by_file.items():
+        console.rule(f"[blue]{json_file.name}")
+        enriched = run_async_enrichment(stale_leads)
+        scored = score_leads(enriched)
+        all_refreshed.extend(scored)
+
+        # Save back to source file
+        _save_json(scored, "scored", json_file.name)
+
+    console.rule("[bold green]Re-enrichment Complete")
+    console.print(f"Refreshed {len(all_refreshed)} leads")
+
+    if notify:
+        run_info = {
+            "vertical": "all",
+            "metro": "all",
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "scraped_count": 0,
+            "qualified_count": len(all_refreshed),
+            "threshold": settings.get("pipeline", {}).get("score_threshold", 55),
+            "is_re_enrich": True,
+        }
+        send_run_summary(all_refreshed, run_info, settings)
+
+
 if __name__ == "__main__":
     cli()
