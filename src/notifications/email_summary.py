@@ -105,3 +105,64 @@ def compose_summary_html(leads: list[Lead], run_info: dict) -> str:
 <p style="color: #888; font-size: 12px;">Full report attached.</p>
 </body>
 </html>"""
+
+
+def send_run_summary(
+    leads: list[Lead],
+    run_info: dict,
+    settings: dict,
+    report_path: Path | None = None,
+) -> None:
+    """Send a summary email for a pipeline run.
+
+    Silently skips if email is not configured or disabled.
+    Catches all SMTP errors to avoid crashing the pipeline.
+    """
+    email_cfg = settings.get("schedule", {}).get("summary_email", {})
+    if not email_cfg.get("enabled", False):
+        return
+
+    smtp_cfg = _get_smtp_config(settings)
+    if not smtp_cfg["to"] or not smtp_cfg["user"]:
+        console.print("  [yellow]Email notification skipped: missing to/user config[/]")
+        return
+
+    try:
+        vertical = run_info.get("vertical", "").upper()
+        metro = run_info.get("metro", "")
+        qualified = run_info.get("qualified_count", len(leads))
+        is_re_enrich = run_info.get("is_re_enrich", False)
+
+        prefix = smtp_cfg["subject_prefix"]
+        run_type = "Re-enrichment" if is_re_enrich else ""
+        subject = f"{prefix} {vertical} {metro} — {qualified} targets {run_type}".strip()
+
+        body_html = compose_summary_html(leads, run_info)
+
+        msg = MIMEMultipart()
+        msg["From"] = smtp_cfg["user"]
+        msg["To"] = smtp_cfg["to"]
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body_html, "html"))
+
+        # Attach report if available
+        if report_path and Path(report_path).exists():
+            with open(report_path, "rb") as f:
+                attachment = MIMEBase("text", "html")
+                attachment.set_payload(f.read())
+                encoders.encode_base64(attachment)
+                attachment.add_header(
+                    "Content-Disposition",
+                    f"attachment; filename={Path(report_path).name}",
+                )
+                msg.attach(attachment)
+
+        with smtplib.SMTP(smtp_cfg["host"], smtp_cfg["port"]) as server:
+            server.starttls()
+            server.login(smtp_cfg["user"], smtp_cfg["password"])
+            server.send_message(msg)
+
+        console.print(f"  [green]Summary email sent to {smtp_cfg['to']}[/]")
+
+    except Exception as e:
+        console.print(f"  [yellow]Email notification failed: {e}[/]")
