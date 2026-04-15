@@ -1,0 +1,43 @@
+# Accounting / CPA / Bookkeeping vertical
+name: accounting
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 20  # Client management is core to accounting firms
+  no_scheduling_tool: 15  # Tax season scheduling is critical
+  no_chat_widget: 10
+  manual_job_postings: 20  # Data entry roles signal manual bookkeeping
+  negative_reviews_ops: 15
+  business_age: 5
+
+extra_manual_keywords:
+  - "bookkeeper"
+  - "data entry"
+  - "accounts payable"
+  - "accounts receivable"
+  - "payroll processing"
+  - "tax preparation"
+  - "reconciliation"
+  - "invoicing"
+  - "expense reports"
+  - "document scanning"
+
+extra_complaint_keywords:
+  - "late filing"
+  - "missed deadline"
+  - "tax error"
+  - "lost documents"
+  - "overcharged"
+  - "unresponsive"
+  - "slow turnaround"
+  - "inaccurate"
+  - "couldn't reach"
+  - "disorganized"
+
+search_queries:
+  - "accounting firm"
+  - "CPA"
+  - "bookkeeping service"
+  - "tax preparation"
+  - "payroll service"
+  - "certified public accountant"

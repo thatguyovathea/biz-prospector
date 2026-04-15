@@ -1,0 +1,42 @@
+# Insurance Agency vertical
+name: insurance
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 20  # CRM is critical for policy tracking and renewals
+  no_scheduling_tool: 10
+  no_chat_widget: 15  # Instant quotes / chat is a big differentiator
+  manual_job_postings: 15
+  negative_reviews_ops: 20
+  business_age: 5
+
+extra_manual_keywords:
+  - "claims processing"
+  - "policy administration"
+  - "underwriting assistant"
+  - "renewal processing"
+  - "certificate of insurance"
+  - "data entry"
+  - "filing"
+  - "quoting"
+  - "endorsement processing"
+
+extra_complaint_keywords:
+  - "claim denied"
+  - "slow claims"
+  - "never called back"
+  - "rate increase"
+  - "couldn't reach anyone"
+  - "lost paperwork"
+  - "wrong policy"
+  - "billing error"
+  - "took forever"
+  - "no follow up"
+
+search_queries:
+  - "insurance agency"
+  - "insurance broker"
+  - "auto insurance"
+  - "home insurance"
+  - "commercial insurance"
+  - "independent insurance agent"

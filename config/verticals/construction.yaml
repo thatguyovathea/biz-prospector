@@ -1,0 +1,43 @@
+# Construction / General Contracting vertical
+name: construction
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 15
+  no_scheduling_tool: 15  # Project scheduling matters but less than service businesses
+  no_chat_widget: 5
+  manual_job_postings: 25  # Heavy manual labor signals = high automation opportunity
+  negative_reviews_ops: 20
+  business_age: 5
+
+extra_manual_keywords:
+  - "project coordinator"
+  - "estimator"
+  - "bid preparation"
+  - "change orders"
+  - "punch list"
+  - "daily logs"
+  - "timesheets"
+  - "material tracking"
+  - "safety compliance"
+  - "permit coordination"
+
+extra_complaint_keywords:
+  - "over budget"
+  - "behind schedule"
+  - "no communication"
+  - "never returned calls"
+  - "left the job"
+  - "subcontractor issues"
+  - "permit delays"
+  - "work not completed"
+  - "poor workmanship"
+  - "didn't show up"
+
+search_queries:
+  - "general contractor"
+  - "construction company"
+  - "home builder"
+  - "remodeling contractor"
+  - "roofing company"
+  - "commercial construction"

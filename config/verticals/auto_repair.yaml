@@ -1,0 +1,44 @@
+# Auto Repair / Mechanic vertical
+name: auto_repair
+
+weights:
+  website_outdated: 15
+  no_crm_detected: 10
+  no_scheduling_tool: 20  # Online appointment booking is a big gap in this vertical
+  no_chat_widget: 10
+  manual_job_postings: 20
+  negative_reviews_ops: 20  # Customers are very vocal about auto repair complaints
+  business_age: 5
+
+extra_manual_keywords:
+  - "service advisor"
+  - "service writer"
+  - "parts counter"
+  - "work orders"
+  - "estimates"
+  - "inventory management"
+  - "vehicle inspection"
+  - "dispatching"
+  - "appointment scheduling"
+
+extra_complaint_keywords:
+  - "overcharged"
+  - "took too long"
+  - "wrong diagnosis"
+  - "car not fixed"
+  - "had to bring it back"
+  - "couldn't get a quote"
+  - "no updates"
+  - "lost my keys"
+  - "rude service"
+  - "hidden fees"
+  - "check engine light still on"
+
+search_queries:
+  - "auto repair shop"
+  - "mechanic"
+  - "auto body shop"
+  - "oil change"
+  - "brake repair"
+  - "transmission repair"
+  - "car service center"
