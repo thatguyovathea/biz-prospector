@@ -214,6 +214,7 @@ def run(
     # Stage 1: Scrape
     console.rule("[bold blue]Stage 1: Scraping")
     leads = scrape_google_maps(vertical, metro, count, provider)
+    scraped_count = len(leads)
     _save_json(leads, "raw", f"{slug}.json")
 
     # Dedup against previous runs
@@ -276,7 +277,7 @@ def run(
             "vertical": vertical,
             "metro": metro,
             "timestamp": timestamp,
-            "scraped_count": len(leads),
+            "scraped_count": scraped_count,
             "qualified_count": len(qualified),
             "threshold": threshold,
             "is_re_enrich": False,
@@ -285,7 +286,7 @@ def run(
 
     console.rule("[bold green]Pipeline Complete")
     console.print(
-        f"Scraped {len(leads)} → Qualified {len(qualified)} → "
+        f"Scraped {scraped_count} → Qualified {len(qualified)} → "
         f"Emails generated for {sum(1 for l in results if l.outreach_email)}"
     )
 
