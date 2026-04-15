@@ -25,7 +25,7 @@ DEFAULT_WEIGHTS = {
     "manual_job_postings": 25,
     "negative_reviews_ops": 15,
     "business_age": 5,
-    "employee_count": 5,
+    "employee_title_signals": 5,
 }
 
 
@@ -100,11 +100,27 @@ def score_lead(lead: Lead, weights: dict[str, float] | None = None) -> Lead:
     breakdown["negative_reviews_ops"] = review_score
     raw_score += review_score * w.get("negative_reviews_ops", 0)
 
-    # --- Business age (placeholder — would need external data) ---
-    breakdown["business_age"] = 0.0  # TODO: enrich with founding date
+    # --- Business age ---
+    if lead.founded_year:
+        company_age = datetime.now().year - lead.founded_year
+        age_score = _normalize(company_age, 3, 20)
+    else:
+        age_score = 0.0
+    breakdown["business_age"] = age_score
+    raw_score += age_score * w.get("business_age", 0)
 
-    # --- Employee count (placeholder) ---
-    breakdown["employee_count"] = 0.0  # TODO: enrich with headcount
+    # --- Employee title signals (manual roles vs tech roles) ---
+    if lead.employee_titles:
+        if lead.tech_role_count > 0:
+            title_score = 0.0
+        elif lead.manual_role_count > 0:
+            title_score = _normalize(lead.manual_role_count, 0, 5)
+        else:
+            title_score = 0.3
+    else:
+        title_score = 0.0
+    breakdown["employee_title_signals"] = title_score
+    raw_score += title_score * w.get("employee_title_signals", 0)
 
     # Normalize to 0-100
     if total_weight > 0:

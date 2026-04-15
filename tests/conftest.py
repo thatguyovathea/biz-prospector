@@ -86,7 +86,7 @@ def sample_settings():
                 "manual_job_postings": 25,
                 "negative_reviews_ops": 15,
                 "business_age": 5,
-                "employee_count": 5,
+                "employee_title_signals": 5,
             },
             "manual_process_keywords": [
                 "data entry",

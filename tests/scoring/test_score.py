@@ -182,7 +182,7 @@ class TestCompositeScoring:
         expected_keys = {
             "website_outdated", "no_crm_detected", "no_scheduling_tool",
             "no_chat_widget", "manual_job_postings", "negative_reviews_ops",
-            "business_age", "employee_count",
+            "business_age", "employee_title_signals",
         }
         assert set(lead.score_breakdown.keys()) == expected_keys
 
@@ -247,3 +247,57 @@ class TestVerticalOverrides:
         with patch("src.scoring.score.load_settings", return_value=sample_settings):
             scored = score_leads(leads)
         assert scored[0].score >= scored[1].score
+
+
+class TestEmployeeTitleSignalsFactor:
+    def test_manual_roles_no_tech(self):
+        lead = make_lead(employee_titles=["Owner", "Data Entry Clerk", "Receptionist"],
+                         manual_role_count=2, tech_role_count=0)
+        score_lead(lead)
+        assert lead.score_breakdown["employee_title_signals"] > 0
+
+    def test_tech_roles_present(self):
+        lead = make_lead(employee_titles=["Owner", "IT Manager"],
+                         manual_role_count=0, tech_role_count=1)
+        score_lead(lead)
+        assert lead.score_breakdown["employee_title_signals"] == 0.0
+
+    def test_no_title_data(self):
+        lead = make_lead(employee_titles=[], manual_role_count=0, tech_role_count=0)
+        score_lead(lead)
+        assert lead.score_breakdown["employee_title_signals"] == 0.0
+
+    def test_employees_but_no_manual_or_tech(self):
+        lead = make_lead(employee_titles=["Owner", "Sales Manager"],
+                         manual_role_count=0, tech_role_count=0)
+        score_lead(lead)
+        assert lead.score_breakdown["employee_title_signals"] == pytest.approx(0.3, abs=0.01)
+
+    def test_many_manual_roles_high_score(self):
+        lead = make_lead(employee_titles=["A", "B", "C", "D", "E", "F"],
+                         manual_role_count=5, tech_role_count=0)
+        score_lead(lead)
+        assert lead.score_breakdown["employee_title_signals"] == 1.0
+
+
+class TestBusinessAgeFactor:
+    def test_founded_15_years_ago(self):
+        lead = make_lead(founded_year=2011)
+        score_lead(lead)
+        score = lead.score_breakdown["business_age"]
+        assert 0.5 < score < 1.0
+
+    def test_founded_1_year_ago(self):
+        lead = make_lead(founded_year=2025)
+        score_lead(lead)
+        assert lead.score_breakdown["business_age"] == 0.0
+
+    def test_founded_30_years_ago(self):
+        lead = make_lead(founded_year=1996)
+        score_lead(lead)
+        assert lead.score_breakdown["business_age"] == 1.0
+
+    def test_no_founded_year(self):
+        lead = make_lead(founded_year=None)
+        score_lead(lead)
+        assert lead.score_breakdown["business_age"] == 0.0
