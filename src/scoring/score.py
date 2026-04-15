@@ -102,7 +102,7 @@ def score_lead(lead: Lead, weights: dict[str, float] | None = None) -> Lead:
 
     # --- Business age ---
     if lead.founded_year:
-        company_age = datetime.now().year - lead.founded_year
+        company_age = datetime.now(timezone.utc).year - lead.founded_year
         age_score = _normalize(company_age, 3, 20)
     else:
         age_score = 0.0
