@@ -148,3 +148,47 @@ class TestAnalyzeEmployeeTitles:
         )
         assert result["manual_role_count"] == 1
         assert result["tech_role_count"] == 1
+
+
+from src.enrichment.linkedin import enrich_lead_with_titles
+
+
+class TestEnrichLeadWithTitles:
+    def test_applies_all_fields(self):
+        lead = make_lead()
+        employees = {
+            "titles": ["Owner", "Data Entry Clerk", "IT Manager"],
+            "employee_count": 45,
+            "founded_year": 2008,
+            "company_linkedin_url": "https://linkedin.com/company/acme",
+        }
+        enrich_lead_with_titles(
+            lead, employees,
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert lead.employee_titles == ["Owner", "Data Entry Clerk", "IT Manager"]
+        assert lead.employee_count == 45
+        assert lead.founded_year == 2008
+        assert lead.company_linkedin_url == "https://linkedin.com/company/acme"
+        assert lead.manual_role_count == 1
+        assert lead.tech_role_count == 1
+
+    def test_empty_employees(self):
+        lead = make_lead()
+        employees = {
+            "titles": [],
+            "employee_count": None,
+            "founded_year": None,
+            "company_linkedin_url": "",
+        }
+        enrich_lead_with_titles(
+            lead, employees,
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert lead.employee_titles == []
+        assert lead.employee_count is None
+        assert lead.founded_year is None
+        assert lead.manual_role_count == 0
+        assert lead.tech_role_count == 0

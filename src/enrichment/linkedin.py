@@ -9,6 +9,8 @@ from __future__ import annotations
 import httpx
 from rich.console import Console
 
+from src.models import Lead
+
 console = Console()
 
 
@@ -96,3 +98,22 @@ def analyze_employee_titles(
         "manual_role_count": manual_count,
         "tech_role_count": tech_count,
     }
+
+
+def enrich_lead_with_titles(
+    lead: Lead,
+    employees: dict,
+    manual_keywords: list[str],
+    tech_keywords: list[str],
+) -> Lead:
+    """Apply employee title analysis and company metadata to a lead."""
+    titles = employees.get("titles", [])
+    lead.employee_titles = titles
+    lead.employee_count = employees.get("employee_count")
+    lead.founded_year = employees.get("founded_year")
+    lead.company_linkedin_url = employees.get("company_linkedin_url", "")
+
+    analysis = analyze_employee_titles(titles, manual_keywords, tech_keywords)
+    lead.manual_role_count = analysis["manual_role_count"]
+    lead.tech_role_count = analysis["tech_role_count"]
+    return lead
