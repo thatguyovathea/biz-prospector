@@ -33,6 +33,7 @@ from src.outreach.generate import generate_batch_outreach
 from src.outreach.delivery import push_to_instantly
 from src.enrichment.async_processor import run_async_enrichment
 from src.dedup import filter_new_leads, mark_processed, get_stats
+from src.reporting.html_report import save_report
 
 console = Console()
 DATA_DIR = Path("data")
@@ -256,11 +257,39 @@ def run(
         console.print(f"  Campaign: {delivery.get('campaign_id')}")
         console.print(f"  Leads added: {delivery.get('leads_added')}")
 
+    # Generate HTML report
+    report_path = save_report(
+        results,
+        title=f"{vertical} {metro} Pipeline Report",
+        vertical=vertical,
+        metro=metro,
+    )
+    console.print(f"  Report: {report_path}")
+
     console.rule("[bold green]Pipeline Complete")
     console.print(
         f"Scraped {len(leads)} → Qualified {len(qualified)} → "
         f"Emails generated for {sum(1 for l in results if l.outreach_email)}"
     )
+
+
+@cli.command()
+@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
+@click.option("--vertical", default="")
+@click.option("--metro", default="")
+@click.option("--output", "output_path", default="", help="Output HTML filename")
+def report(input_path: str, vertical: str, metro: str, output_path: str):
+    """Generate an HTML report from scored/outreach leads."""
+    leads = _load_leads(input_path)
+    title = f"{vertical} {metro} Report".strip() if vertical or metro else "Pipeline Run Report"
+    path = save_report(
+        leads,
+        filename=output_path,
+        title=title,
+        vertical=vertical,
+        metro=metro,
+    )
+    console.print(f"[green]Report saved to {path}[/]")
 
 
 @cli.command()
