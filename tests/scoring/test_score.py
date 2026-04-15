@@ -201,6 +201,14 @@ class TestCompositeScoring:
         assert lead.scored_at is not None
 
 
+class TestZeroWeights:
+    def test_zero_total_weight_gives_zero_score(self):
+        lead = make_lead(has_crm=False)
+        zero_weights = {k: 0 for k in DEFAULT_WEIGHTS}
+        score_lead(lead, weights=zero_weights)
+        assert lead.score == 0.0
+
+
 class TestCustomWeights:
     def test_custom_weights_applied(self):
         lead = make_lead(has_crm=False, has_scheduling=False)

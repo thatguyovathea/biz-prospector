@@ -65,6 +65,34 @@ class TestLeadToInstantlyFormat:
 
 class TestInstantlyClient:
     @respx.mock
+    def test_get_request(self):
+        respx.get("https://api.instantly.ai/api/v1/campaign/list").mock(
+            return_value=httpx.Response(200, json=[{"id": "camp_1"}])
+        )
+        client = InstantlyClient("fake-key")
+        result = client.list_campaigns()
+        assert result == [{"id": "camp_1"}]
+
+    @respx.mock
+    def test_list_campaigns(self):
+        respx.get("https://api.instantly.ai/api/v1/campaign/list").mock(
+            return_value=httpx.Response(200, json=[{"id": "c1"}, {"id": "c2"}])
+        )
+        client = InstantlyClient("fake-key")
+        campaigns = client.list_campaigns()
+        assert len(campaigns) == 2
+
+    @respx.mock
+    def test_get_campaign_stats(self):
+        respx.get("https://api.instantly.ai/api/v1/analytics/campaign/summary").mock(
+            return_value=httpx.Response(200, json={"sent": 50, "opened": 20})
+        )
+        client = InstantlyClient("fake-key")
+        stats = client.get_campaign_stats("camp_123")
+        assert stats["sent"] == 50
+        assert stats["opened"] == 20
+
+    @respx.mock
     def test_create_campaign(self):
         respx.post("https://api.instantly.ai/api/v1/campaign/create").mock(
             return_value=httpx.Response(200, json={"id": "camp_123", "name": "Test"})

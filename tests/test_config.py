@@ -43,6 +43,39 @@ class TestLoadVertical:
         assert result == {}
 
 
+class TestAllVerticalConfigs:
+    """Verify all vertical config files are valid and well-structured."""
+
+    @pytest.mark.parametrize("vertical", [
+        "hvac", "dental", "legal", "property_management",
+        "construction", "insurance", "accounting", "auto_repair",
+    ])
+    def test_vertical_loads(self, vertical):
+        config = load_vertical(vertical)
+        assert config["name"] == vertical
+        assert "weights" in config
+        assert "extra_manual_keywords" in config
+        assert "extra_complaint_keywords" in config
+
+    @pytest.mark.parametrize("vertical", [
+        "hvac", "dental", "legal", "property_management",
+        "construction", "insurance", "accounting", "auto_repair",
+    ])
+    def test_vertical_weights_sum_to_100(self, vertical):
+        config = load_vertical(vertical)
+        total = sum(config["weights"].values())
+        assert total == 100, f"{vertical} weights sum to {total}, expected 100"
+
+    @pytest.mark.parametrize("vertical", [
+        "hvac", "dental", "legal", "property_management",
+        "construction", "insurance", "accounting", "auto_repair",
+    ])
+    def test_vertical_has_keywords(self, vertical):
+        config = load_vertical(vertical)
+        assert len(config["extra_manual_keywords"]) >= 3
+        assert len(config["extra_complaint_keywords"]) >= 3
+
+
 class TestGetApiKey:
     def test_retrieves_key(self):
         settings = {"apis": {"serpapi_key": "my-key-123"}}

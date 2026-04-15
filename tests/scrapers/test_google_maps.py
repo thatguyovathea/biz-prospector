@@ -11,10 +11,12 @@ from src.scrapers.google_maps import (
     parse_serpapi_result,
     parse_apify_result,
     scrape_serpapi,
+    scrape_apify,
     scrape_google_maps,
+    save_leads,
     _make_id,
 )
-from src.models import LeadSource
+from src.models import Lead, LeadSource
 
 
 class TestMakeId:
@@ -148,3 +150,129 @@ class TestScrapeGoogleMaps:
         with patch("src.scrapers.google_maps.load_settings", return_value=sample_settings):
             with pytest.raises(ValueError, match="Unknown provider"):
                 scrape_google_maps("hvac", "portland-or", provider="unknown")
+
+    @respx.mock
+    def test_apify_provider(self, sample_settings):
+        """Test scrape_google_maps dispatches to Apify when provider=apify."""
+        # Mock the Apify actor run start
+        respx.post("https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"id": "run_123", "defaultDatasetId": "ds_456"}
+            })
+        )
+        # Mock the status check — immediately SUCCEEDED
+        respx.get("https://api.apify.com/v2/actor-runs/run_123").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"status": "SUCCEEDED"}
+            })
+        )
+        # Mock the dataset items
+        respx.get("https://api.apify.com/v2/datasets/ds_456/items").mock(
+            return_value=httpx.Response(200, json=[
+                {"title": "Apify Biz", "address": "789 Apify St"},
+            ])
+        )
+        with patch("src.scrapers.google_maps.load_settings", return_value=sample_settings):
+            leads = scrape_google_maps("hvac", "portland-or", num_results=5, provider="apify")
+        assert len(leads) == 1
+        assert leads[0].business_name == "Apify Biz"
+
+
+class TestScrapeApify:
+    @respx.mock
+    def test_full_apify_run(self):
+        respx.post("https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"id": "run_abc", "defaultDatasetId": "ds_xyz"}
+            })
+        )
+        respx.get("https://api.apify.com/v2/actor-runs/run_abc").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"status": "SUCCEEDED"}
+            })
+        )
+        respx.get("https://api.apify.com/v2/datasets/ds_xyz/items").mock(
+            return_value=httpx.Response(200, json=[
+                {"title": "Biz A", "address": "1 Main St"},
+                {"title": "Biz B", "address": "2 Oak Ave"},
+            ])
+        )
+        results = scrape_apify("hvac portland", "portland", "fake-token", num_results=10)
+        assert len(results) == 2
+        assert results[0]["title"] == "Biz A"
+
+    @respx.mock
+    def test_apify_run_failed(self):
+        respx.post("https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"id": "run_fail", "defaultDatasetId": "ds_fail"}
+            })
+        )
+        respx.get("https://api.apify.com/v2/actor-runs/run_fail").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"status": "FAILED"}
+            })
+        )
+        with pytest.raises(RuntimeError, match="FAILED"):
+            scrape_apify("hvac", "portland", "fake-token")
+
+
+class TestScrapeApifyPolling:
+    @respx.mock
+    def test_polls_until_succeeded(self):
+        """Test that scrape_apify polls status and waits via time.sleep."""
+        respx.post("https://api.apify.com/v2/acts/nwua9Gu5YrADL7ZDj/runs").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"id": "run_poll", "defaultDatasetId": "ds_poll"}
+            })
+        )
+        call_count = 0
+
+        def status_side_effect(request):
+            nonlocal call_count
+            call_count += 1
+            if call_count < 3:
+                return httpx.Response(200, json={"data": {"status": "RUNNING"}})
+            return httpx.Response(200, json={"data": {"status": "SUCCEEDED"}})
+
+        respx.get("https://api.apify.com/v2/actor-runs/run_poll").mock(
+            side_effect=status_side_effect
+        )
+        respx.get("https://api.apify.com/v2/datasets/ds_poll/items").mock(
+            return_value=httpx.Response(200, json=[
+                {"title": "Polled Biz", "address": "1 Poll St"},
+            ])
+        )
+        with patch("time.sleep"):
+            results = scrape_apify("hvac portland", "portland", "fake-token", num_results=5)
+        assert len(results) == 1
+        assert call_count == 3
+
+
+class TestGoogleMapsMain:
+    def test_main_cli(self, sample_settings):
+        from click.testing import CliRunner
+        from src.scrapers.google_maps import main as gm_main
+
+        runner = CliRunner()
+        with patch("src.scrapers.google_maps.load_settings", return_value=sample_settings), \
+             patch("src.scrapers.google_maps.scrape_google_maps", return_value=[]) as mock_scrape, \
+             patch("src.scrapers.google_maps.save_leads"):
+            result = runner.invoke(gm_main, ["--vertical", "hvac", "--metro", "portland-or"])
+        assert result.exit_code == 0
+
+
+class TestSaveLeads:
+    def test_saves_to_json(self, tmp_path):
+        leads = [
+            Lead(business_name="Test Biz", id="abc123"),
+            Lead(business_name="Another Biz", id="def456"),
+        ]
+        with patch("src.scrapers.google_maps.DATA_DIR", tmp_path):
+            path = save_leads(leads, "test_output.json")
+        assert path.exists()
+        import json
+        with open(path) as f:
+            data = json.load(f)
+        assert len(data) == 2
+        assert data[0]["business_name"] == "Test Biz"

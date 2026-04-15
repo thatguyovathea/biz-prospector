@@ -8,6 +8,7 @@ from src.scrapers.job_posts import (
     analyze_job_postings,
     enrich_lead_with_jobs,
     search_jobs_serpapi,
+    search_jobs_apify,
 )
 from tests.conftest import make_lead
 
@@ -72,6 +73,32 @@ class TestSearchJobsSerpapi:
             return_value=httpx.Response(200, json={})
         )
         results = search_jobs_serpapi("Nobody Inc", "Nowhere", "fake-key")
+        assert results == []
+
+
+class TestSearchJobsApify:
+    @respx.mock
+    def test_fetches_jobs_via_apify(self):
+        respx.post(
+            "https://api.apify.com/v2/acts/hMvNSpz3JnHgl5jkh/run-sync-get-dataset-items"
+        ).mock(
+            return_value=httpx.Response(200, json=[
+                {"title": "Receptionist", "description": "Answer phones"},
+                {"title": "Data Entry", "description": "Enter data daily"},
+            ])
+        )
+        results = search_jobs_apify("Acme HVAC", "Portland, OR", "fake-token")
+        assert len(results) == 2
+        assert results[0]["title"] == "Receptionist"
+
+    @respx.mock
+    def test_empty_apify_results(self):
+        respx.post(
+            "https://api.apify.com/v2/acts/hMvNSpz3JnHgl5jkh/run-sync-get-dataset-items"
+        ).mock(
+            return_value=httpx.Response(200, json=[])
+        )
+        results = search_jobs_apify("Nobody", "Nowhere", "fake-token")
         assert results == []
 
 

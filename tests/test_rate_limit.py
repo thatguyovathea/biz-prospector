@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -133,3 +133,51 @@ class TestRetryWithRateLimit:
 
         with pytest.raises(httpx.HTTPStatusError):
             always_fails()
+
+    def test_retries_on_timeout(self):
+        attempt = 0
+
+        @retry_with_rate_limit("serpapi", max_attempts=3)
+        def timeout_then_ok():
+            nonlocal attempt
+            attempt += 1
+            if attempt < 2:
+                raise httpx.TimeoutException("timed out")
+            return "recovered"
+
+        result = timeout_then_ok()
+        assert result == "recovered"
+        assert attempt == 2
+
+    def test_timeout_exhausts_retries(self):
+        @retry_with_rate_limit("serpapi", max_attempts=2)
+        def always_timeout():
+            raise httpx.TimeoutException("timed out")
+
+        with pytest.raises(httpx.TimeoutException):
+            always_timeout()
+
+
+class TestRateLimiterSleepPaths:
+    def test_sync_wait_sleeps_when_full(self):
+        limiter = RateLimiter(calls_per_minute=1)
+        # Fill the window with a recent timestamp
+        limiter._timestamps = [time.monotonic()]
+        with patch("time.sleep") as mock_sleep:
+            limiter.wait()
+            mock_sleep.assert_called_once()
+            assert mock_sleep.call_args[0][0] > 0
+
+    @pytest.mark.asyncio
+    async def test_async_wait_sleeps_when_full(self):
+        limiter = RateLimiter(calls_per_minute=1)
+        # Fill the window with a recent timestamp
+        limiter._timestamps = [time.monotonic()]
+
+        async def fake_sleep(duration):
+            pass
+
+        with patch("asyncio.sleep", side_effect=fake_sleep) as mock_sleep:
+            await limiter.async_wait()
+            mock_sleep.assert_called_once()
+            assert mock_sleep.call_args[0][0] > 0

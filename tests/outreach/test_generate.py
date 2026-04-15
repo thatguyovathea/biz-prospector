@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.outreach.generate import _build_lead_context, generate_outreach
+from src.outreach.generate import _build_lead_context, generate_outreach, generate_batch_outreach
 from tests.conftest import make_lead
 
 
@@ -130,3 +130,91 @@ class TestGenerateOutreach:
 
         assert result.outreach_email == ""
         assert result.contacted_at is None
+
+
+class TestBuildLeadContextAdditional:
+    def test_includes_ssl_gap(self):
+        lead = make_lead(has_ssl=False)
+        context = _build_lead_context(lead)
+        assert "SSL" in context
+
+    def test_includes_not_mobile_responsive(self):
+        lead = make_lead(is_mobile_responsive=False)
+        context = _build_lead_context(lead)
+        assert "mobile" in context.lower()
+
+    def test_includes_tech_stack(self):
+        lead = make_lead(tech_stack=["wordpress", "jquery"])
+        context = _build_lead_context(lead)
+        assert "wordpress" in context
+        assert "jquery" in context
+
+    def test_includes_complaint_samples(self):
+        lead = make_lead(
+            ops_complaint_count=3,
+            reviews_analyzed=20,
+            ops_complaint_samples=["never called back", "lost my invoice", "rude staff"],
+        )
+        context = _build_lead_context(lead)
+        assert "never called back" in context
+
+    def test_score_without_breakdown(self):
+        lead = make_lead(score=50.0, score_breakdown={})
+        context = _build_lead_context(lead)
+        assert "50.0/100" in context
+
+
+class TestGenerateBatchOutreach:
+    def test_batch_generates_for_multiple_leads(self, sample_settings):
+        mock_response = MagicMock()
+        mock_response.content = [MagicMock()]
+        mock_response.content[0].text = json.dumps({
+            "subject": "Hi",
+            "body": "Hello there",
+            "followups": ["Follow up"],
+        })
+
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_response
+
+        leads = [make_lead(id="l1"), make_lead(id="l2")]
+
+        with patch("src.outreach.generate.load_settings", return_value=sample_settings), \
+             patch("src.outreach.generate.anthropic") as mock_anthropic:
+            mock_anthropic.Anthropic.return_value = mock_client
+            results = generate_batch_outreach(leads)
+
+        assert len(results) == 2
+        for lead in results:
+            assert "Hi" in lead.outreach_email
+            assert len(lead.followups) == 1
+
+    def test_batch_handles_partial_failure(self, sample_settings):
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("API error")
+            resp = MagicMock()
+            resp.content = [MagicMock()]
+            resp.content[0].text = json.dumps({
+                "subject": "Ok",
+                "body": "Works",
+                "followups": [],
+            })
+            return resp
+
+        mock_client = MagicMock()
+        mock_client.messages.create.side_effect = side_effect
+
+        leads = [make_lead(id="fail"), make_lead(id="succeed")]
+
+        with patch("src.outreach.generate.load_settings", return_value=sample_settings), \
+             patch("src.outreach.generate.anthropic") as mock_anthropic:
+            mock_anthropic.Anthropic.return_value = mock_client
+            results = generate_batch_outreach(leads)
+
+        assert results[0].outreach_email == ""
+        assert "Ok" in results[1].outreach_email
