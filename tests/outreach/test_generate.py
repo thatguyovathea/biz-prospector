@@ -3,8 +3,6 @@
 import json
 from unittest.mock import patch, MagicMock
 
-import pytest
-
 from src.outreach.generate import _build_lead_context, generate_outreach, generate_batch_outreach
 from tests.conftest import make_lead
 

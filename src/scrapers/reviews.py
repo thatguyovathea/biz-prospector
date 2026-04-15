@@ -6,12 +6,8 @@ that signal a business needs modernization.
 
 from __future__ import annotations
 
-import re
-
 import httpx
 from rich.console import Console
-
-from src.config import load_settings, get_api_key
 from src.models import Lead
 
 console = Console()

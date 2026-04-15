@@ -1,6 +1,5 @@
 """Tests for rate limiting and retry utilities."""
 
-import asyncio
 import time
 from unittest.mock import MagicMock, patch
 

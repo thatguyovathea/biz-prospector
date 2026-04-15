@@ -1,6 +1,5 @@
 """Tests for Google Maps scraper."""
 
-import hashlib
 from unittest.mock import patch
 
 import httpx

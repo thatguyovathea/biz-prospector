@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import httpx
 from rich.console import Console
-
-from src.config import load_settings, get_api_key
 from src.models import Lead
 
 console = Console()

@@ -2,8 +2,6 @@
 
 from unittest.mock import patch
 
-import pytest
-
 from src.reporting.html_report import (
     _score_histogram_bins,
     _tech_stack_counts,

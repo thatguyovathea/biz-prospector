@@ -1,7 +1,6 @@
 """Tests for job posting scraper and analyzer."""
 
 import httpx
-import pytest
 import respx
 
 from src.scrapers.job_posts import (

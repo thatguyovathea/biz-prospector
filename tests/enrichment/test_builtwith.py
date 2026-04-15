@@ -1,7 +1,6 @@
 """Tests for BuiltWith API integration."""
 
 import httpx
-import pytest
 import respx
 
 from src.enrichment.builtwith import (

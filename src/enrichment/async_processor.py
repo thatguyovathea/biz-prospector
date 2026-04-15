@@ -9,11 +9,10 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 
-import httpx
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from src.config import load_settings, get_api_key
+from src.config import load_settings
 from src.models import Lead
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
 from src.enrichment.contacts import enrich_lead_contacts, _extract_domain

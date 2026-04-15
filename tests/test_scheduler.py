@@ -1,6 +1,5 @@
 """Tests for crontab scheduler management."""
 
-import subprocess
 from unittest.mock import patch, MagicMock
 
 import pytest

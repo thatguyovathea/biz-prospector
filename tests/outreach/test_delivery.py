@@ -3,7 +3,6 @@
 from unittest.mock import patch
 
 import httpx
-import pytest
 import respx
 
 from src.outreach.delivery import (

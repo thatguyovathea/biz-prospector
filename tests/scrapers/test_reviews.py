@@ -1,7 +1,6 @@
 """Tests for review scraper and analyzer."""
 
 import httpx
-import pytest
 import respx
 
 from src.scrapers.reviews import (
