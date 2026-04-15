@@ -402,6 +402,30 @@ class TestReEnrichCommand:
         assert result.exit_code == 0
         mock_send.assert_called_once()
 
+    def test_re_enrich_naive_datetime(self, runner, sample_settings, tmp_path):
+        """Naive datetime enriched_at should not cause TypeError vs UTC cutoff."""
+        from datetime import datetime, timedelta
+        # Naive datetime (no timezone info) — 45 days old
+        old_date = (datetime.now() - timedelta(days=45)).isoformat()
+        leads = [
+            make_lead(id="naive1", score=60.0, enriched_at=old_date).model_dump(mode="json"),
+        ]
+        scored_dir = tmp_path / "scored"
+        scored_dir.mkdir()
+        (scored_dir / "test_scored.json").write_text(json.dumps(leads))
+
+        sample_settings["schedule"] = {"re_enrich": {"max_age_days": 30}}
+        mock_enriched = [make_lead(id="naive1", score=65.0)]
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.run_async_enrichment", return_value=mock_enriched), \
+             patch("src.pipeline.score_leads", return_value=mock_enriched), \
+             patch("src.pipeline.send_run_summary"), \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, ["re-enrich"])
+        assert result.exit_code == 0
+        assert "Re-enriching 1 stale leads" in result.output
+
     def test_re_enrich_empty_scored_dir(self, runner, sample_settings, tmp_path):
         scored_dir = tmp_path / "scored"
         scored_dir.mkdir()

@@ -350,6 +350,8 @@ def re_enrich(max_age: int | None, notify: bool):
                     enriched_dt = datetime.fromisoformat(lead.enriched_at)
                 else:
                     enriched_dt = lead.enriched_at
+                if enriched_dt.tzinfo is None:
+                    enriched_dt = enriched_dt.replace(tzinfo=timezone.utc)
                 if enriched_dt < cutoff:
                     stale.append(lead)
             else:
