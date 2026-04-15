@@ -84,3 +84,67 @@ class TestFetchCompanyEmployees:
         )
         result = fetch_company_employees("slow.com", "fake-key")
         assert result["titles"] == []
+
+
+from src.enrichment.linkedin import analyze_employee_titles
+
+
+class TestAnalyzeEmployeeTitles:
+    def test_counts_manual_roles(self):
+        titles = ["Owner", "Data Entry Clerk", "Receptionist", "Sales Manager"]
+        result = analyze_employee_titles(
+            titles,
+            manual_keywords=["data entry", "receptionist"],
+            tech_keywords=["it manager", "developer"],
+        )
+        assert result["manual_role_count"] == 2
+        assert result["tech_role_count"] == 0
+
+    def test_counts_tech_roles(self):
+        titles = ["Owner", "IT Manager", "Software Developer", "CRM Administrator"]
+        result = analyze_employee_titles(
+            titles,
+            manual_keywords=["data entry", "receptionist"],
+            tech_keywords=["it manager", "developer", "crm"],
+        )
+        assert result["manual_role_count"] == 0
+        assert result["tech_role_count"] == 3
+
+    def test_mixed_roles(self):
+        titles = ["Data Entry Clerk", "IT Manager", "Office Manager"]
+        result = analyze_employee_titles(
+            titles,
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert result["manual_role_count"] == 1
+        assert result["tech_role_count"] == 1
+
+    def test_no_matching_titles(self):
+        titles = ["Owner", "Sales Manager", "Accountant"]
+        result = analyze_employee_titles(
+            titles,
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert result["manual_role_count"] == 0
+        assert result["tech_role_count"] == 0
+
+    def test_empty_titles(self):
+        result = analyze_employee_titles(
+            [],
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert result["manual_role_count"] == 0
+        assert result["tech_role_count"] == 0
+
+    def test_case_insensitive(self):
+        titles = ["DATA ENTRY SPECIALIST", "IT MANAGER"]
+        result = analyze_employee_titles(
+            titles,
+            manual_keywords=["data entry"],
+            tech_keywords=["it manager"],
+        )
+        assert result["manual_role_count"] == 1
+        assert result["tech_role_count"] == 1

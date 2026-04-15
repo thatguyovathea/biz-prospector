@@ -73,3 +73,26 @@ def fetch_company_employees(
         "founded_year": founded_year,
         "company_linkedin_url": company_linkedin_url,
     }
+
+
+def analyze_employee_titles(
+    titles: list[str],
+    manual_keywords: list[str],
+    tech_keywords: list[str],
+) -> dict:
+    """Classify employee titles as manual-process or tech-maturity signals.
+
+    Returns dict with: manual_role_count, tech_role_count.
+    """
+    manual_count = 0
+    tech_count = 0
+    for title in titles:
+        title_lower = title.lower()
+        if any(kw in title_lower for kw in manual_keywords):
+            manual_count += 1
+        if any(kw in title_lower for kw in tech_keywords):
+            tech_count += 1
+    return {
+        "manual_role_count": manual_count,
+        "tech_role_count": tech_count,
+    }
