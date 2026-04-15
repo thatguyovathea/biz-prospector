@@ -110,3 +110,31 @@ outreach:
   followup_count: 2
   # Days between follow-ups
   followup_interval_days: 3
+
+schedule:
+  # Prospecting jobs — each becomes a crontab entry
+  # Run 'python -m src.pipeline schedule install' after configuring
+  jobs: []
+    # Example:
+    # - name: "hvac-portland"
+    #   vertical: hvac
+    #   metro: portland-or
+    #   cron: "0 6 * * 1"         # Every Monday at 6am
+    #   count: 100
+    #   push_instantly: false
+
+  # Re-enrichment of stale leads
+  re_enrich:
+    enabled: false
+    cron: "0 2 * * 0"             # Every Sunday at 2am
+    max_age_days: 30
+
+  # Email notification after scheduled runs
+  summary_email:
+    enabled: false
+    to: ""
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    smtp_user: ""                  # Or set env var BIZ_SMTP_USER
+    smtp_password: ""              # Or set env var BIZ_SMTP_PASSWORD
+    subject_prefix: "[biz-prospector]"

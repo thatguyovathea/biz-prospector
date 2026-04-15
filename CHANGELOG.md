@@ -9,6 +9,9 @@ All notable changes to this project are documented here.
 - Employee title analysis via Apollo People Search (free endpoint) for scoring
 - Business age scoring from Apollo organization data (founded year)
 - LinkedIn URL capture for contacts
+- Scheduled pipeline runs via crontab (schedule install/list/remove commands)
+- Re-enrich command for refreshing stale scored leads
+- Email summary notifications after scheduled runs (SMTP, HTML digest with report attachment)
 
 ## [0.1.0] — 2026-04-14 (Retroactive)
 

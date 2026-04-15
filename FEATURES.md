@@ -29,3 +29,6 @@ Living reference of all implemented features.
 - **HTML report generation** — Score distributions, top leads, tech stack breakdown, tool gaps
 - **Rate limiting** — Token bucket pattern with configurable per-service limits
 - **Retry logic** — Exponential backoff for all HTTP calls
+- **Scheduled runs** — Cron-based automation with install/list/remove management
+- **Re-enrichment** — Refresh stale leads (older than N days) with updated data
+- **Email summaries** — HTML digest of top leads sent after each scheduled run
