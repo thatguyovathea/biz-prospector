@@ -44,7 +44,7 @@ async def _enrich_single(
 ) -> Lead:
     """Enrich a single lead with all available data sources."""
     async with semaphore:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
 
         # Website audit (CPU-bound-ish, run in thread)
         if lead.website:
