@@ -89,6 +89,8 @@ async def _enrich_single(
         hunter_key = settings.get("apis", {}).get("hunter_key", "")
         if apollo_key or hunter_key:
             try:
+                contact_limiter = get_limiter("apollo" if apollo_key else "hunter")
+                await contact_limiter.async_wait()
                 await loop.run_in_executor(
                     None, enrich_lead_contacts, lead, apollo_key, hunter_key, True
                 )
