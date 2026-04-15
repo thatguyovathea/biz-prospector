@@ -1,0 +1,7 @@
+project: biz-prospector
+track: standard
+platform: web-api
+language: python
+governance: private-poc
+test_interval: 2
+uat_required: false

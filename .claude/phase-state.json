@@ -1,0 +1,15 @@
+{
+  "project": "biz-prospector",
+  "framework_version": "1.0",
+  "current_phase": 2,
+  "track": "standard",
+  "deployment": "personal",
+  "poc_mode": "private-poc",
+  "compliance_ready": false,
+  "gates": {
+    "phase_0_to_1": "2026-04-14",
+    "phase_1_to_2": "2026-04-14",
+    "phase_2_to_3": null,
+    "phase_3_to_4": null
+  }
+}
