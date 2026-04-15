@@ -84,6 +84,23 @@ class TestComposeSummaryHtml:
         html = compose_summary_html(leads, run_info)
         assert "Re-enrichment" in html or "re-enrich" in html.lower()
 
+    def test_score_zero_renders_as_number(self):
+        """Score of 0.0 should render as '0.0', not '—'."""
+        leads = [make_lead(business_name="Zero Score Co", score=0.0)]
+        run_info = {
+            "vertical": "hvac",
+            "metro": "portland-or",
+            "timestamp": "2026-04-14",
+            "scraped_count": 1,
+            "qualified_count": 1,
+            "threshold": 0,
+            "is_re_enrich": False,
+        }
+        html = compose_summary_html(leads, run_info)
+        assert "0.0" in html
+        # The dash should NOT appear for a lead with score=0.0
+        assert "Zero Score Co" in html
+
     def test_empty_leads(self):
         run_info = {
             "vertical": "hvac",

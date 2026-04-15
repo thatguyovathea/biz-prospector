@@ -73,7 +73,7 @@ def compose_summary_html(leads: list[Lead], run_info: dict) -> str:
     top_leads = sorted(leads, key=lambda l: l.score or 0, reverse=True)[:10]
     rows = ""
     for lead in top_leads:
-        score_str = f"{lead.score:.1f}" if lead.score else "—"
+        score_str = f"{lead.score:.1f}" if lead.score is not None else "—"
         name = html_lib.escape(lead.business_name[:30])
         contact = html_lib.escape(f"{lead.contact_name} ({lead.contact_title})" if lead.contact_name else "—")
         signals = html_lib.escape(_build_signals(lead))
