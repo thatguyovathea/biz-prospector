@@ -16,7 +16,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from src.config import load_settings, get_api_key
 from src.models import Lead
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
-from src.enrichment.contacts import enrich_lead_contacts
+from src.enrichment.contacts import enrich_lead_contacts, _extract_domain
+from src.enrichment.linkedin import fetch_company_employees, enrich_lead_with_titles
 from src.scrapers.reviews import (
     fetch_reviews_outscraper,
     analyze_reviews,
@@ -38,6 +39,8 @@ async def _enrich_single(
     semaphore: asyncio.Semaphore,
     complaint_kw: list[str],
     manual_kw: list[str],
+    manual_role_kw: list[str],
+    tech_role_kw: list[str],
 ) -> Lead:
     """Enrich a single lead with all available data sources."""
     async with semaphore:
@@ -92,6 +95,20 @@ async def _enrich_single(
             except Exception:
                 pass
 
+        # Employee title analysis (uses Apollo People Search — free endpoint)
+        if apollo_key and lead.website:
+            try:
+                limiter = get_limiter("apollo")
+                await limiter.async_wait()
+                domain = _extract_domain(lead.website)
+                if domain:
+                    employees = await loop.run_in_executor(
+                        None, fetch_company_employees, domain, apollo_key
+                    )
+                    enrich_lead_with_titles(lead, employees, manual_role_kw, tech_role_kw)
+            except Exception:
+                pass
+
         lead.enriched_at = datetime.now(timezone.utc)
         return lead
 
@@ -109,6 +126,8 @@ async def enrich_leads_async(
     settings = load_settings()
     complaint_kw = settings.get("scoring", {}).get("ops_complaint_keywords", [])
     manual_kw = settings.get("scoring", {}).get("manual_process_keywords", [])
+    manual_role_kw = settings.get("scoring", {}).get("manual_role_keywords", [])
+    tech_role_kw = settings.get("scoring", {}).get("tech_role_keywords", [])
     semaphore = asyncio.Semaphore(max_concurrent)
 
     console.print(
@@ -117,7 +136,8 @@ async def enrich_leads_async(
     )
 
     tasks = [
-        _enrich_single(lead, settings, semaphore, complaint_kw, manual_kw)
+        _enrich_single(lead, settings, semaphore, complaint_kw, manual_kw,
+                        manual_role_kw, tech_role_kw)
         for lead in leads
     ]
 

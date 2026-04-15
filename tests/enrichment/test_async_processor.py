@@ -67,7 +67,8 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.fetch_company_employees", return_value={"titles": [], "employee_count": None, "founded_year": None, "company_linkedin_url": ""}):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 1
@@ -147,3 +148,57 @@ class TestEnrichLeadsAsync:
 
         assert len(results) == 1
         assert results[0].enriched_at is not None
+
+
+class TestLinkedInEnrichment:
+    @pytest.mark.asyncio
+    async def test_title_enrichment_runs(self, mock_settings):
+        leads = [make_lead(id="li1", website="https://acme.com")]
+        mock_fetch = MagicMock(return_value={
+            "titles": ["Owner", "Data Entry Clerk"],
+            "employee_count": 10,
+            "founded_year": 2010,
+            "company_linkedin_url": "",
+        })
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.fetch_company_employees", mock_fetch), \
+             patch("src.enrichment.async_processor.enrich_lead_with_titles") as mock_enrich:
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        mock_fetch.assert_called_once()
+        mock_enrich.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_title_enrichment_exception_swallowed(self, mock_settings):
+        leads = [make_lead(id="li_err", website="https://error.com")]
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.fetch_company_employees", side_effect=Exception("Apollo down")):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None
+
+    @pytest.mark.asyncio
+    async def test_skips_title_enrichment_without_website(self, mock_settings):
+        leads = [make_lead(id="noweb", website="")]
+        mock_fetch = MagicMock()
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.fetch_company_employees", mock_fetch):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        mock_fetch.assert_not_called()
