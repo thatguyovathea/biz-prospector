@@ -31,10 +31,10 @@ python -m src.pipeline outreach --input data/scored/leads_scored.json
 ## APIs used
 - SerpAPI or Apify: Google Maps scraping, job posting search
 - Outscraper: Google review scraping
-- BuiltWith: Tech stack lookups (not yet wired in, currently using HTML detection)
-- Apollo/Hunter: Contact enrichment (not yet implemented)
+- BuiltWith: Tech stack lookups (integrated via BuiltWith Domain API v22)
+- Apollo/Hunter: Contact enrichment (Apollo primary, Hunter fallback, email verification)
 - Anthropic Claude: Outreach email generation
-- Instantly.ai: Email delivery (not yet implemented)
+- Instantly.ai: Email delivery (campaign creation, lead push, sequence setup)
 
 ## What's built vs TODO
 ### Built (functional structure, needs API keys to run):
@@ -50,13 +50,13 @@ python -m src.pipeline outreach --input data/scored/leads_scored.json
 - Async concurrent enrichment with per-service rate limiting
 - Deduplication across pipeline runs
 - Retry logic with exponential backoff for all HTTP calls
-- Vertical configs: HVAC, dental, legal, property management
+- Vertical configs: HVAC, dental, legal, property management, construction, insurance, accounting, auto repair
 
 ### TODO — priority order:
-1. BuiltWith API integration for better tech stack data (currently HTML-only detection)
-2. Tests — unit tests for scoring logic, website audit pattern matching, dedup
-3. HTML report generator (summary of run results, top leads, score distributions)
-4. More verticals (construction, insurance, accounting, auto repair)
+1. ~~BuiltWith API integration~~ ✓
+2. ~~Tests~~ ✓ (375 tests, 99% coverage)
+3. ~~HTML report generator~~ ✓
+4. ~~More verticals~~ ✓ (construction, insurance, accounting, auto repair)
 5. LinkedIn enrichment for employee title analysis
 6. Scheduled/cron pipeline runs
 7. SQLite or Postgres backend instead of JSON files (for larger scale)
@@ -66,3 +66,33 @@ python -m src.pipeline outreach --input data/scored/leads_scored.json
 - Settings in config/settings.yaml (copy from settings.example.yaml)
 - All intermediate data is JSON in data/ subdirs
 - Python 3.11+, dependencies in requirements.txt
+
+## Solo Orchestrator Framework
+
+This project follows the [solo-orchestrator](https://github.com/kraulerson/solo-orchestrator) development methodology. The framework is installed as a git submodule at `.claude/framework/`.
+
+### Current Phase
+Read `.claude/phase-state.json` for the current phase. Phase gate criteria are enforced by `scripts/check-phase-gate.sh` and the CI pipeline.
+
+### Five-Phase Model
+- **Phase 0:** Product Discovery → Product Manifesto (`PROJECT_INTAKE.md`)
+- **Phase 1:** Architecture & Planning → Project Bible
+- **Phase 2:** Construction → Working codebase with tests (CURRENT)
+- **Phase 3:** Validation & Security → Scan results and test evidence
+- **Phase 4:** Release & Maintenance → Deployment readiness
+
+### Development Rules
+- **Tests first** — write failing tests before implementation code (TDD)
+- **No secrets in code** — API keys go in `config/settings.yaml` (gitignored), never in source
+- **Update artifacts** — when adding a feature update `FEATURES.md`; when changing behavior update `CHANGELOG.md`; when finding a bug add to `BUGS.md`
+- **Phase gates** — run `bash scripts/check-phase-gate.sh` before requesting a phase transition
+
+### Pre-commit Hook
+Install the pre-commit hook (not tracked by git):
+```bash
+cp docs/reference/pre-commit-hook.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+The hook runs gitleaks for secret detection and warns if source files are committed without tests.
+
+### CI Pipeline
+GitHub Actions runs on push/PR to main: lint (ruff), test (pytest), SAST (Semgrep), secret detection (gitleaks), dependency audit (pip-audit), license check (pip-licenses), phase gate validation.
