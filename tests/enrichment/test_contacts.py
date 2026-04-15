@@ -322,3 +322,45 @@ class TestEnrichLeadContacts:
         lead = make_lead(website="")
         enrich_lead_contacts(lead, apollo_key="fake")
         assert lead.contact_name == "Alice Owner"
+
+
+class TestLinkedInUrlCapture:
+    @respx.mock
+    def test_captures_linkedin_url_from_apollo(self):
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [{
+                    "first_name": "Bob",
+                    "last_name": "Owner",
+                    "email": "bob@acme.com",
+                    "title": "Owner",
+                    "linkedin_url": "https://linkedin.com/in/bobowner",
+                    "phone_number": "",
+                }]
+            })
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake-key")
+        assert lead.linkedin_url == "https://linkedin.com/in/bobowner"
+
+    @respx.mock
+    def test_captures_linkedin_url_from_hunter(self):
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={"people": []})
+        )
+        respx.get("https://api.hunter.io/v2/domain-search").mock(
+            return_value=httpx.Response(200, json={
+                "data": {
+                    "emails": [{
+                        "first_name": "Jane",
+                        "last_name": "Doe",
+                        "value": "jane@acme.com",
+                        "position": "CEO",
+                        "linkedin": "https://linkedin.com/in/janedoe",
+                    }]
+                }
+            })
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        assert lead.linkedin_url == "https://linkedin.com/in/janedoe"

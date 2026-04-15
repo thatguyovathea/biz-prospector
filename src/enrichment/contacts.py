@@ -211,6 +211,7 @@ def enrich_lead_contacts(
         lead.contact_name = best.get("name", "")
         lead.contact_email = best.get("email", "")
         lead.contact_title = best.get("title", "")
+        lead.linkedin_url = best.get("linkedin_url", "")
 
         # Optional email verification
         if verify and lead.contact_email and hunter_key:
