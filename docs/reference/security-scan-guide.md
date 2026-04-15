@@ -1,0 +1,1 @@
+../../.claude/framework/docs/security-scan-guide.md
