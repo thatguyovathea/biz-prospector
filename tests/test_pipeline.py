@@ -286,3 +286,50 @@ class TestRunCommand:
             ])
         assert result.exit_code == 0
         assert "Skipped 1" in result.output
+
+
+class TestRunNotify:
+    def test_run_with_notify_sends_email(self, runner, sample_settings, tmp_path):
+        mock_leads = [make_lead(id="n1", score=70.0)]
+        sample_settings["schedule"] = {
+            "summary_email": {
+                "enabled": True, "to": "test@test.com",
+                "smtp_host": "smtp.test.com", "smtp_port": 587,
+                "smtp_user": "u", "smtp_password": "p",
+            }
+        }
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.scrape_google_maps", return_value=mock_leads), \
+             patch("src.pipeline.run_async_enrichment", return_value=mock_leads), \
+             patch("src.pipeline.mark_processed"), \
+             patch("src.pipeline.score_leads", return_value=mock_leads), \
+             patch("src.pipeline.generate_batch_outreach", return_value=mock_leads), \
+             patch("src.pipeline.save_report", return_value=tmp_path / "report.html"), \
+             patch("src.pipeline.send_run_summary") as mock_send, \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, [
+                "run", "--vertical", "hvac", "--metro", "portland-or",
+                "--skip-dedup", "--notify",
+            ])
+        assert result.exit_code == 0
+        mock_send.assert_called_once()
+
+    def test_run_without_notify_skips_email(self, runner, sample_settings, tmp_path):
+        mock_leads = [make_lead(id="n1", score=70.0)]
+
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.scrape_google_maps", return_value=mock_leads), \
+             patch("src.pipeline.run_async_enrichment", return_value=mock_leads), \
+             patch("src.pipeline.mark_processed"), \
+             patch("src.pipeline.score_leads", return_value=mock_leads), \
+             patch("src.pipeline.generate_batch_outreach", return_value=mock_leads), \
+             patch("src.pipeline.save_report", return_value=tmp_path / "report.html"), \
+             patch("src.pipeline.send_run_summary") as mock_send, \
+             patch("src.pipeline.DATA_DIR", tmp_path):
+            result = runner.invoke(cli, [
+                "run", "--vertical", "hvac", "--metro", "portland-or",
+                "--skip-dedup",
+            ])
+        assert result.exit_code == 0
+        mock_send.assert_not_called()

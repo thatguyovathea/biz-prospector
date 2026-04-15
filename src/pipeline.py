@@ -34,6 +34,7 @@ from src.outreach.delivery import push_to_instantly
 from src.enrichment.async_processor import run_async_enrichment
 from src.dedup import filter_new_leads, mark_processed, get_stats
 from src.reporting.html_report import save_report
+from src.notifications.email_summary import send_run_summary
 
 console = Console()
 DATA_DIR = Path("data")
@@ -193,6 +194,7 @@ def outreach(input_path: str):
 @click.option("--concurrent", default=10, help="Max concurrent enrichment tasks")
 @click.option("--skip-dedup", is_flag=True, help="Process all leads even if seen before")
 @click.option("--push-instantly", is_flag=True, help="Push results to Instantly.ai")
+@click.option("--notify", is_flag=True, help="Send summary email after completion")
 def run(
     vertical: str,
     metro: str,
@@ -201,6 +203,7 @@ def run(
     concurrent: int,
     skip_dedup: bool,
     push_instantly: bool,
+    notify: bool,
 ):
     """Run the full pipeline: scrape → enrich → score → outreach → [deliver]."""
     settings = load_settings()
@@ -265,6 +268,19 @@ def run(
         metro=metro,
     )
     console.print(f"  Report: {report_path}")
+
+    # Email notification (for scheduled runs)
+    if notify:
+        run_info = {
+            "vertical": vertical,
+            "metro": metro,
+            "timestamp": timestamp,
+            "scraped_count": len(leads),
+            "qualified_count": len(qualified),
+            "threshold": threshold,
+            "is_re_enrich": False,
+        }
+        send_run_summary(results, run_info, settings, report_path=report_path)
 
     console.rule("[bold green]Pipeline Complete")
     console.print(
