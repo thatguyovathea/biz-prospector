@@ -58,6 +58,15 @@ class Lead(BaseModel):
     contact_email: str = ""
     contact_title: str = ""
 
+    # LinkedIn / Employee title analysis (populated in enrichment)
+    linkedin_url: str = ""
+    company_linkedin_url: str = ""
+    employee_count: Optional[int] = None
+    founded_year: Optional[int] = None
+    employee_titles: list[str] = Field(default_factory=list)
+    manual_role_count: int = 0
+    tech_role_count: int = 0
+
     # Scoring (populated in scoring stage)
     score: Optional[float] = None
     score_breakdown: dict[str, float] = Field(default_factory=dict)
