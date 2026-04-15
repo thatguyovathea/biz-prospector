@@ -58,6 +58,33 @@ class TestFetchCompanyEmployees:
         assert result["company_linkedin_url"] == "https://linkedin.com/company/acme"
 
     @respx.mock
+    def test_linkedin_url_in_later_person(self):
+        """company_linkedin_url should be found even if not on first person."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [
+                    {
+                        "title": "Owner",
+                        "organization": {
+                            "estimated_num_employees": 10,
+                            "founded_year": 2015,
+                        },
+                    },
+                    {
+                        "title": "Manager",
+                        "organization": {
+                            "linkedin_url": "https://linkedin.com/company/late",
+                        },
+                    },
+                ],
+            })
+        )
+        result = fetch_company_employees("late.com", "fake-key")
+        assert result["employee_count"] == 10
+        assert result["founded_year"] == 2015
+        assert result["company_linkedin_url"] == "https://linkedin.com/company/late"
+
+    @respx.mock
     def test_empty_response(self):
         respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
             return_value=httpx.Response(200, json={"people": []})

@@ -66,7 +66,7 @@ def fetch_company_employees(
             founded_year = org["founded_year"]
         if org.get("linkedin_url"):
             company_linkedin_url = org["linkedin_url"]
-        if employee_count is not None and founded_year is not None:
+        if employee_count is not None and founded_year is not None and company_linkedin_url:
             break
 
     return {
