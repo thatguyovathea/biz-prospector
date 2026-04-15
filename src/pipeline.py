@@ -35,6 +35,7 @@ from src.enrichment.async_processor import run_async_enrichment
 from src.dedup import filter_new_leads, mark_processed, get_stats
 from src.reporting.html_report import save_report
 from src.notifications.email_summary import send_run_summary
+from src.scheduler import install_jobs, list_jobs, remove_jobs
 
 console = Console()
 DATA_DIR = Path("data")
@@ -387,6 +388,56 @@ def re_enrich(max_age: int | None, notify: bool):
             "is_re_enrich": True,
         }
         send_run_summary(all_refreshed, run_info, settings)
+
+
+@cli.group()
+def schedule():
+    """Manage scheduled pipeline runs (cron jobs)."""
+    pass
+
+
+@schedule.command(name="install")
+def schedule_install():
+    """Install cron jobs from settings.yaml schedule config."""
+    settings = load_settings()
+    try:
+        names = install_jobs(settings)
+        if names:
+            console.print(f"[green]Installed {len(names)} scheduled jobs:[/]")
+            for name in names:
+                console.print(f"  • {name}")
+        else:
+            console.print("[yellow]No jobs configured in settings.yaml[/]")
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+
+
+@schedule.command(name="list")
+def schedule_list():
+    """List installed biz-prospector cron jobs."""
+    jobs = list_jobs()
+    if not jobs:
+        console.print("No scheduled jobs found.")
+        return
+
+    table = Table(title="Scheduled Jobs")
+    table.add_column("Job", style="cyan")
+    table.add_column("Schedule")
+    for job in jobs:
+        table.add_row(job["name"], job["schedule"])
+    console.print(table)
+
+
+@schedule.command(name="remove")
+def schedule_remove():
+    """Remove all biz-prospector cron jobs."""
+    if not click.confirm("Remove all scheduled biz-prospector jobs?"):
+        return
+    count = remove_jobs()
+    if count > 0:
+        console.print(f"[green]Removed {count} scheduled job(s)[/]")
+    else:
+        console.print("No scheduled jobs to remove.")
 
 
 if __name__ == "__main__":

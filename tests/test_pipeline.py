@@ -411,3 +411,46 @@ class TestReEnrichCommand:
             result = runner.invoke(cli, ["re-enrich"])
         assert result.exit_code == 0
         assert "No stale leads" in result.output or "No scored" in result.output
+
+
+class TestScheduleCommands:
+    def test_schedule_install(self, runner, sample_settings):
+        sample_settings["schedule"] = {
+            "jobs": [{"name": "test", "vertical": "hvac",
+                      "metro": "portland-or", "cron": "0 6 * * 1"}],
+            "re_enrich": {"enabled": False},
+        }
+        with patch("src.pipeline.load_settings", return_value=sample_settings), \
+             patch("src.pipeline.install_jobs", return_value=["test"]) as mock_install:
+            result = runner.invoke(cli, ["schedule", "install"])
+        assert result.exit_code == 0
+        mock_install.assert_called_once()
+        assert "test" in result.output
+
+    def test_schedule_list(self, runner):
+        jobs = [
+            {"name": "hvac-portland", "schedule": "0 6 * * 1", "command": "..."},
+            {"name": "dental-seattle", "schedule": "0 6 * * 3", "command": "..."},
+        ]
+        with patch("src.pipeline.list_jobs", return_value=jobs):
+            result = runner.invoke(cli, ["schedule", "list"])
+        assert result.exit_code == 0
+        assert "hvac-portland" in result.output
+        assert "dental-seattle" in result.output
+
+    def test_schedule_list_empty(self, runner):
+        with patch("src.pipeline.list_jobs", return_value=[]):
+            result = runner.invoke(cli, ["schedule", "list"])
+        assert result.exit_code == 0
+        assert "No scheduled jobs" in result.output
+
+    def test_schedule_remove(self, runner):
+        with patch("src.pipeline.remove_jobs", return_value=2):
+            result = runner.invoke(cli, ["schedule", "remove"], input="y\n")
+        assert result.exit_code == 0
+        assert "Removed 2" in result.output
+
+    def test_schedule_remove_none(self, runner):
+        with patch("src.pipeline.remove_jobs", return_value=0):
+            result = runner.invoke(cli, ["schedule", "remove"], input="y\n")
+        assert result.exit_code == 0
