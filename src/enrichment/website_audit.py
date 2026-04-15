@@ -19,6 +19,7 @@ from bs4 import BeautifulSoup
 from rich.console import Console
 
 from src.models import Lead
+from src.enrichment.builtwith import fetch_builtwith, merge_tech_stacks
 
 console = Console()
 
@@ -66,6 +67,7 @@ class AuditResult:
     is_mobile_responsive: bool = False
     outdated_signals_found: list[str] | None = None
     detected_tech: list[str] | None = None
+    builtwith_tech: list[dict] | None = None
     page_speed_score: int | None = None
     error: str | None = None
 
@@ -124,8 +126,17 @@ def _detect_tech_from_html(html: str, soup: BeautifulSoup) -> list[str]:
     return tech
 
 
-def audit_website(url: str, timeout: int = 15) -> AuditResult:
-    """Audit a single website for modernization signals."""
+def audit_website(
+    url: str, timeout: int = 15, builtwith_key: str = ""
+) -> AuditResult:
+    """Audit a single website for modernization signals.
+
+    Args:
+        url: Website URL to audit.
+        timeout: HTTP request timeout in seconds.
+        builtwith_key: Optional BuiltWith API key. If provided,
+            augments HTML detection with API-based tech stack data.
+    """
     if not url:
         return AuditResult(url=url, error="no_url")
 
@@ -155,7 +166,17 @@ def audit_website(url: str, timeout: int = 15) -> AuditResult:
             result.has_scheduling = _check_patterns(html, SCHEDULING_PATTERNS)
             result.is_mobile_responsive = _check_mobile_responsive(soup)
             result.outdated_signals_found = _find_outdated_signals(html)
-            result.detected_tech = _detect_tech_from_html(html, soup)
+
+            html_tech = _detect_tech_from_html(html, soup)
+
+            # BuiltWith API augmentation (optional)
+            if builtwith_key:
+                domain = str(resp.url.host)
+                bw_tech = fetch_builtwith(domain, builtwith_key, timeout=timeout)
+                result.builtwith_tech = bw_tech
+                result.detected_tech = merge_tech_stacks(html_tech, bw_tech)
+            else:
+                result.detected_tech = html_tech
 
     except httpx.TimeoutException:
         result.error = "timeout"

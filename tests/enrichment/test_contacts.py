@@ -12,6 +12,7 @@ from src.enrichment.contacts import (
     verify_email_hunter,
     _title_priority,
     _pick_best_contact,
+    _extract_domain,
     enrich_lead_contacts,
 )
 from tests.conftest import make_lead
@@ -132,6 +133,17 @@ class TestVerifyEmailHunter:
         assert result["score"] == 95
 
 
+class TestExtractDomain:
+    def test_normal_url(self):
+        assert _extract_domain("https://acmehvac.com/about") == "acmehvac.com"
+
+    def test_empty_string(self):
+        assert _extract_domain("") == ""
+
+    def test_no_suffix(self):
+        assert _extract_domain("http://localhost") == ""
+
+
 class TestEnrichLeadContacts:
     @respx.mock
     def test_apollo_success(self):
@@ -184,3 +196,129 @@ class TestEnrichLeadContacts:
         enrich_lead_contacts(lead)
         assert lead.contact_name == ""
         assert lead.contact_email == ""
+
+    @respx.mock
+    def test_apollo_returns_empty_falls_to_hunter(self):
+        """Apollo succeeds but returns no people — should fall to Hunter."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={"people": []})
+        )
+        respx.get("https://api.hunter.io/v2/domain-search").mock(
+            return_value=httpx.Response(200, json={
+                "data": {
+                    "emails": [{
+                        "first_name": "Hunter",
+                        "last_name": "Result",
+                        "value": "hunter@acme.com",
+                        "position": "Owner",
+                    }]
+                }
+            })
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        assert lead.contact_name == "Hunter Result"
+        assert lead.contact_email == "hunter@acme.com"
+
+    @respx.mock
+    def test_hunter_exception_doesnt_crash(self):
+        """Hunter failing should not crash the enrichment."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={"people": []})
+        )
+        respx.get("https://api.hunter.io/v2/domain-search").mock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        assert lead.contact_name == ""
+
+    @respx.mock
+    def test_email_verification_invalid_clears_email(self):
+        """Invalid email verification should clear the contact_email."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [{
+                    "first_name": "Bob",
+                    "last_name": "Test",
+                    "email": "bob@invalid.com",
+                    "title": "Owner",
+                    "linkedin_url": "",
+                    "phone_number": "",
+                }]
+            })
+        )
+        respx.get("https://api.hunter.io/v2/email-verifier").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"status": "invalid", "score": 10}
+            })
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        assert lead.contact_name == "Bob Test"
+        assert lead.contact_email == ""
+
+    @respx.mock
+    def test_email_verification_valid_keeps_email(self):
+        """Valid email verification should keep the contact_email."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [{
+                    "first_name": "Bob",
+                    "last_name": "Test",
+                    "email": "bob@valid.com",
+                    "title": "Owner",
+                    "linkedin_url": "",
+                    "phone_number": "",
+                }]
+            })
+        )
+        respx.get("https://api.hunter.io/v2/email-verifier").mock(
+            return_value=httpx.Response(200, json={
+                "data": {"status": "valid", "score": 95}
+            })
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        assert lead.contact_email == "bob@valid.com"
+
+    @respx.mock
+    def test_verification_exception_doesnt_crash(self):
+        """Verification failure should not crash — email stays."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [{
+                    "first_name": "Bob",
+                    "last_name": "Test",
+                    "email": "bob@acme.com",
+                    "title": "Owner",
+                    "linkedin_url": "",
+                    "phone_number": "",
+                }]
+            })
+        )
+        respx.get("https://api.hunter.io/v2/email-verifier").mock(
+            side_effect=httpx.TimeoutException("timeout")
+        )
+        lead = make_lead(website="https://acmehvac.com")
+        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        assert lead.contact_email == "bob@acme.com"
+
+    @respx.mock
+    def test_apollo_with_company_name_no_domain(self):
+        """When lead has no website, Apollo should use company name."""
+        respx.post("https://api.apollo.io/v1/mixed_people/search").mock(
+            return_value=httpx.Response(200, json={
+                "people": [{
+                    "first_name": "Alice",
+                    "last_name": "Owner",
+                    "email": "alice@acme.com",
+                    "title": "Owner",
+                    "linkedin_url": "",
+                    "phone_number": "",
+                }]
+            })
+        )
+        lead = make_lead(website="")
+        enrich_lead_contacts(lead, apollo_key="fake")
+        assert lead.contact_name == "Alice Owner"

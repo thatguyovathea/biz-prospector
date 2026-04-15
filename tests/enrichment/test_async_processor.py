@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from src.enrichment.async_processor import enrich_leads_async
+from src.enrichment.async_processor import enrich_leads_async, run_async_enrichment
 from tests.conftest import make_lead
 
 
@@ -56,3 +56,94 @@ class TestEnrichLeadsAsync:
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_calls_audit_with_builtwith_key(self, mock_settings):
+        """Verify enrichment runs when lead has a website (BuiltWith key from settings)."""
+        leads = [make_lead(id="l1", website="https://example.com")]
+        mock_audit = MagicMock()
+
+        with patch("src.enrichment.async_processor.audit_website", mock_audit), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None
+
+    @pytest.mark.asyncio
+    async def test_skips_website_audit_for_no_website(self, mock_settings):
+        """Leads without a website should skip website audit entirely."""
+        leads = [make_lead(id="noweb", website="")]
+        mock_audit = MagicMock()
+
+        with patch("src.enrichment.async_processor.audit_website", mock_audit), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit") as mock_enrich, \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        mock_audit.assert_not_called()
+        mock_enrich.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_review_exception_swallowed(self, mock_settings):
+        """Exception in review fetch doesn't crash enrichment."""
+        leads = [make_lead(id="rev_err", website="", place_id="place_123")]
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", side_effect=Exception("API down")), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None
+
+    @pytest.mark.asyncio
+    async def test_job_search_exception_swallowed(self, mock_settings):
+        """Exception in job search doesn't crash enrichment."""
+        leads = [make_lead(id="job_err", website="")]
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", side_effect=Exception("SerpAPI down")), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None
+
+    @pytest.mark.asyncio
+    async def test_contact_enrichment_exception_swallowed(self, mock_settings):
+        """Exception in contact enrichment doesn't crash enrichment."""
+        leads = [make_lead(id="contact_err", website="")]
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts", side_effect=Exception("Apollo down")):
+            results = await enrich_leads_async(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None
+
+    def test_sync_wrapper(self, mock_settings):
+        """Test the synchronous wrapper around async enrichment."""
+        leads = [make_lead(id="sync", website="")]
+
+        with patch("src.enrichment.async_processor.audit_website"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
+             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+            results = run_async_enrichment(leads, max_concurrent=2)
+
+        assert len(results) == 1
+        assert results[0].enriched_at is not None

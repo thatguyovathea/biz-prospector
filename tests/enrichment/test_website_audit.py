@@ -213,6 +213,55 @@ class TestAuditWebsite:
         assert result.reachable is True
 
 
+class TestAuditWebsiteWithBuiltWith:
+    @respx.mock
+    def test_builtwith_augments_html_detection(self):
+        html = build_html(techs=["wordpress"])
+        respx.get("https://acmehvac.com").mock(
+            return_value=httpx.Response(200, text=html)
+        )
+        bw_response = {
+            "Results": [{
+                "Result": {
+                    "Paths": [{
+                        "Technologies": [
+                            {"Name": "Nginx", "Tag": "web-server", "Categories": ["Web Server"]},
+                            {"Name": "WordPress 6.4", "Tag": "cms", "Categories": ["CMS"]},
+                        ]
+                    }]
+                }
+            }]
+        }
+        with patch("src.enrichment.website_audit.fetch_builtwith", return_value=[
+            {"name": "Nginx", "normalized": "nginx", "tag": "web-server", "categories": ["Web Server"]},
+            {"name": "WordPress 6.4", "normalized": "wordpress", "tag": "cms", "categories": ["CMS"]},
+        ]) as mock_bw:
+            result = audit_website("https://acmehvac.com", builtwith_key="fake-key")
+        mock_bw.assert_called_once()
+        assert "wordpress" in result.detected_tech
+        assert "nginx" in result.detected_tech
+        assert result.builtwith_tech is not None
+
+    @respx.mock
+    def test_no_builtwith_key_skips_api(self):
+        html = build_html(techs=["react"])
+        respx.get("https://acmehvac.com").mock(
+            return_value=httpx.Response(200, text=html)
+        )
+        with patch("src.enrichment.website_audit.fetch_builtwith") as mock_bw:
+            result = audit_website("https://acmehvac.com", builtwith_key="")
+        mock_bw.assert_not_called()
+        assert result.builtwith_tech is None
+        assert "react" in result.detected_tech
+
+    @respx.mock
+    def test_generic_exception_in_audit(self):
+        respx.get("https://broken.com").mock(side_effect=ConnectionError("DNS failed"))
+        result = audit_website("https://broken.com")
+        assert result.reachable is False
+        assert "DNS failed" in result.error
+
+
 class TestEnrichLeadWithAudit:
     def test_applies_audit_to_lead(self):
         lead = make_lead()

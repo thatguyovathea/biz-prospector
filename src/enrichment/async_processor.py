@@ -47,8 +47,9 @@ async def _enrich_single(
         if lead.website:
             limiter = get_limiter("website_audit")
             await limiter.async_wait()
+            builtwith_key = settings.get("apis", {}).get("builtwith_key", "")
             audit = await loop.run_in_executor(
-                None, audit_website, lead.website
+                None, lambda: audit_website(lead.website, builtwith_key=builtwith_key)
             )
             enrich_lead_with_audit(lead, audit)
 
