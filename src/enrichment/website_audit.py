@@ -45,7 +45,7 @@ SCHEDULING_PATTERNS = [
 OUTDATED_SIGNALS = [
     r"jquery\.min\.js\?ver=[12]\.",  # jQuery 1.x or 2.x
     r"wp-content.*flavor=starter",    # Very old WordPress themes
-    r"<meta name=\"generator\" content=\"wordpress [1-4]\.",  # WP < 5
+    r'<meta name="generator" content="wordpress [1-4]\.',  # WP < 5
     r"<frameset",                     # Framesets
     r"<marquee",                      # Marquee tags
     r"<blink",                        # Blink tags
