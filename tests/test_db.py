@@ -234,3 +234,224 @@ class TestUpsertLeads:
         from src.db import get_lead
 
         assert get_lead(self.conn, "nonexistent") is None
+
+
+class TestGetLeads:
+    """Tests for get_leads() with various filters."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from src.db import get_db, upsert_leads
+
+        self.conn = get_db(":memory:")
+        # Seed 6 leads across 2 metros and 2 categories, some scored
+        self.leads = [
+            make_lead(id="p1", metro="portland-or", category="HVAC", score=80.0),
+            make_lead(id="p2", metro="portland-or", category="HVAC", score=60.0),
+            make_lead(id="p3", metro="portland-or", category="dental", score=None),
+            make_lead(id="s1", metro="seattle-wa", category="HVAC", score=90.0),
+            make_lead(id="s2", metro="seattle-wa", category="dental", score=40.0),
+            make_lead(id="s3", metro="seattle-wa", category="dental", score=None),
+        ]
+        upsert_leads(self.conn, self.leads)
+        yield
+        self.conn.close()
+
+    def test_get_all_leads(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn)
+        assert len(results) == 6
+
+    def test_filter_by_metro(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, metro="portland-or")
+        assert len(results) == 3
+        assert all(l.metro == "portland-or" for l in results)
+
+    def test_filter_by_category(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, category="dental")
+        assert len(results) == 3
+        assert all(l.category == "dental" for l in results)
+
+    def test_filter_by_min_score(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, min_score=70.0)
+        assert len(results) == 2
+        assert {l.id for l in results} == {"p1", "s1"}
+
+    def test_scored_only(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, scored_only=True)
+        assert len(results) == 4
+        assert all(l.score is not None for l in results)
+
+    def test_limit(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, limit=2)
+        assert len(results) == 2
+
+    def test_combined_filters(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, metro="seattle-wa", category="dental", scored_only=True)
+        assert len(results) == 1
+        assert results[0].id == "s2"
+
+    def test_no_matches(self):
+        from src.db import get_leads
+
+        results = get_leads(self.conn, metro="nonexistent")
+        assert results == []
+
+
+class TestDedup:
+    """Tests for mark_processed, filter_new_leads, get_dedup_stats."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from src.db import get_db
+
+        self.conn = get_db(":memory:")
+        yield
+        self.conn.close()
+
+    def test_mark_processed_inserts_records(self):
+        from src.db import mark_processed
+
+        leads = [make_lead(id=f"lead-{i}") for i in range(3)]
+        mark_processed(self.conn, leads, "scrape")
+        count = self.conn.execute("SELECT COUNT(*) FROM dedup").fetchone()[0]
+        assert count == 3
+
+    def test_mark_processed_idempotent(self):
+        from src.db import mark_processed
+
+        leads = [make_lead(id="lead-1")]
+        mark_processed(self.conn, leads, "scrape")
+        mark_processed(self.conn, leads, "scrape")  # duplicate — should not fail
+        count = self.conn.execute("SELECT COUNT(*) FROM dedup").fetchone()[0]
+        assert count == 1
+
+    def test_filter_new_leads_returns_unprocessed(self):
+        from src.db import mark_processed, filter_new_leads
+
+        old = [make_lead(id="old-1"), make_lead(id="old-2")]
+        mark_processed(self.conn, old, "enrich")
+
+        candidates = [make_lead(id="old-1"), make_lead(id="new-1"), make_lead(id="new-2")]
+        new_leads, skipped = filter_new_leads(self.conn, candidates, "enrich")
+        assert len(new_leads) == 2
+        assert skipped == 1
+        assert {l.id for l in new_leads} == {"new-1", "new-2"}
+
+    def test_filter_new_leads_different_stage(self):
+        from src.db import mark_processed, filter_new_leads
+
+        leads = [make_lead(id="lead-1")]
+        mark_processed(self.conn, leads, "scrape")
+        # Same lead but different stage should be considered new
+        new_leads, skipped = filter_new_leads(self.conn, leads, "enrich")
+        assert len(new_leads) == 1
+        assert skipped == 0
+
+    def test_get_dedup_stats(self):
+        from src.db import mark_processed, get_dedup_stats
+
+        mark_processed(self.conn, [make_lead(id=f"s-{i}") for i in range(3)], "scrape")
+        mark_processed(self.conn, [make_lead(id=f"e-{i}") for i in range(2)], "enrich")
+        stats = get_dedup_stats(self.conn)
+        assert stats == {"scrape": 3, "enrich": 2}
+
+    def test_get_dedup_stats_empty(self):
+        from src.db import get_dedup_stats
+
+        stats = get_dedup_stats(self.conn)
+        assert stats == {}
+
+
+class TestPipelineRuns:
+    """Tests for start_run, finish_run, get_run_history."""
+
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        from src.db import get_db
+
+        self.conn = get_db(":memory:")
+        yield
+        self.conn.close()
+
+    def test_start_run_returns_id(self):
+        from src.db import start_run
+
+        run_id = start_run(self.conn, "hvac", "portland-or", threshold=55.0)
+        assert isinstance(run_id, int)
+        assert run_id > 0
+
+    def test_start_run_stores_metadata(self):
+        from src.db import start_run
+
+        run_id = start_run(self.conn, "dental", "seattle-wa", threshold=60.0, is_re_enrich=True)
+        row = self.conn.execute("SELECT * FROM pipeline_runs WHERE id = ?", (run_id,)).fetchone()
+        assert row["vertical"] == "dental"
+        assert row["metro"] == "seattle-wa"
+        assert row["threshold"] == 60.0
+        assert row["is_re_enrich"] == 1
+
+    def test_finish_run_updates_counts(self):
+        from src.db import start_run, finish_run
+
+        run_id = start_run(self.conn, "hvac", "portland-or", threshold=55.0)
+        finish_run(self.conn, run_id, {
+            "scraped_count": 100,
+            "enriched_count": 80,
+            "qualified_count": 30,
+            "emailed_count": 25,
+        })
+        row = self.conn.execute("SELECT * FROM pipeline_runs WHERE id = ?", (run_id,)).fetchone()
+        assert row["scraped_count"] == 100
+        assert row["enriched_count"] == 80
+        assert row["qualified_count"] == 30
+        assert row["emailed_count"] == 25
+        assert row["completed_at"] is not None
+
+    def test_get_run_history(self):
+        from src.db import start_run, finish_run, get_run_history
+
+        for i in range(3):
+            rid = start_run(self.conn, "hvac", f"metro-{i}", threshold=55.0)
+            finish_run(self.conn, rid, {"scraped_count": i * 10})
+        history = get_run_history(self.conn, limit=2)
+        assert len(history) == 2
+        # Most recent first
+        assert history[0]["metro"] == "metro-2"
+
+    def test_get_stale_leads(self):
+        from src.db import get_db, upsert_leads, get_stale_leads
+
+        cutoff = datetime(2026, 4, 1, tzinfo=timezone.utc)
+        stale = make_lead(
+            id="stale-1",
+            score=70.0,
+            enriched_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        )
+        fresh = make_lead(
+            id="fresh-1",
+            score=70.0,
+            enriched_at=datetime(2026, 4, 10, tzinfo=timezone.utc),
+        )
+        unscored = make_lead(
+            id="unscored",
+            score=None,
+            enriched_at=datetime(2026, 3, 1, tzinfo=timezone.utc),
+        )
+        upsert_leads(self.conn, [stale, fresh, unscored])
+        results = get_stale_leads(self.conn, cutoff)
+        assert len(results) == 1
+        assert results[0].id == "stale-1"

@@ -232,3 +232,164 @@ def get_lead(conn: sqlite3.Connection, lead_id: str) -> Lead | None:
     if row is None:
         return None
     return _row_to_lead(row)
+
+
+def get_leads(
+    conn: sqlite3.Connection,
+    *,
+    metro: str | None = None,
+    category: str | None = None,
+    min_score: float | None = None,
+    scored_only: bool = False,
+    limit: int | None = None,
+) -> list[Lead]:
+    """Flexible lead query with optional filters.
+
+    Args:
+        conn: Database connection.
+        metro: Filter by metro area.
+        category: Filter by business category.
+        min_score: Minimum score threshold.
+        scored_only: If True, exclude leads with NULL score.
+        limit: Maximum number of results.
+
+    Returns:
+        List of Lead models matching the filters.
+    """
+    clauses: list[str] = []
+    params: list = []
+
+    if metro is not None:
+        clauses.append("metro = ?")
+        params.append(metro)
+    if category is not None:
+        clauses.append("category = ?")
+        params.append(category)
+    if min_score is not None:
+        clauses.append("score >= ?")
+        params.append(min_score)
+    if scored_only:
+        clauses.append("score IS NOT NULL")
+
+    sql = "SELECT * FROM leads"
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    if limit is not None:
+        sql += " LIMIT ?"
+        params.append(limit)
+
+    rows = conn.execute(sql, params).fetchall()
+    return [_row_to_lead(row) for row in rows]
+
+
+# ---------------------------------------------------------------------------
+# Dedup operations
+# ---------------------------------------------------------------------------
+
+
+def mark_processed(conn: sqlite3.Connection, leads: list[Lead], stage: str) -> None:
+    """Record that leads have been processed for a given stage.
+
+    Uses INSERT OR IGNORE so duplicates are silently skipped.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    conn.executemany(
+        "INSERT OR IGNORE INTO dedup (lead_id, stage, processed_at) VALUES (?, ?, ?)",
+        [(lead.id, stage, now) for lead in leads],
+    )
+    conn.commit()
+
+
+def filter_new_leads(
+    conn: sqlite3.Connection, leads: list[Lead], stage: str
+) -> tuple[list[Lead], int]:
+    """Filter out leads that have already been processed for a stage.
+
+    Returns:
+        Tuple of (new_leads, skipped_count).
+    """
+    if not leads:
+        return [], 0
+
+    lead_ids = [lead.id for lead in leads]
+    placeholders = ", ".join(["?"] * len(lead_ids))
+    rows = conn.execute(
+        f"SELECT lead_id FROM dedup WHERE stage = ? AND lead_id IN ({placeholders})",
+        [stage] + lead_ids,
+    ).fetchall()
+    seen = {row["lead_id"] for row in rows}
+
+    new_leads = [lead for lead in leads if lead.id not in seen]
+    skipped = len(leads) - len(new_leads)
+    return new_leads, skipped
+
+
+def get_dedup_stats(conn: sqlite3.Connection) -> dict[str, int]:
+    """Return count of processed leads per stage."""
+    rows = conn.execute(
+        "SELECT stage, COUNT(*) as cnt FROM dedup GROUP BY stage"
+    ).fetchall()
+    return {row["stage"]: row["cnt"] for row in rows}
+
+
+# ---------------------------------------------------------------------------
+# Pipeline run tracking
+# ---------------------------------------------------------------------------
+
+
+def start_run(
+    conn: sqlite3.Connection,
+    vertical: str,
+    metro: str,
+    threshold: float | None = None,
+    is_re_enrich: bool = False,
+) -> int:
+    """Create a new pipeline run record and return its ID."""
+    now = datetime.now(timezone.utc).isoformat()
+    cursor = conn.execute(
+        """INSERT INTO pipeline_runs (vertical, metro, started_at, threshold, is_re_enrich)
+           VALUES (?, ?, ?, ?, ?)""",
+        (vertical, metro, now, threshold, 1 if is_re_enrich else 0),
+    )
+    conn.commit()
+    return cursor.lastrowid
+
+
+def finish_run(conn: sqlite3.Connection, run_id: int, counts: dict[str, int]) -> None:
+    """Mark a pipeline run as completed and update count columns."""
+    now = datetime.now(timezone.utc).isoformat()
+    set_clauses = ["completed_at = ?"]
+    params: list = [now]
+
+    for col in ("scraped_count", "enriched_count", "qualified_count", "emailed_count"):
+        if col in counts:
+            set_clauses.append(f"{col} = ?")
+            params.append(counts[col])
+
+    params.append(run_id)
+    conn.execute(
+        f"UPDATE pipeline_runs SET {', '.join(set_clauses)} WHERE id = ?",
+        params,
+    )
+    conn.commit()
+
+
+def get_run_history(conn: sqlite3.Connection, limit: int = 20) -> list[dict]:
+    """Return recent pipeline runs, most recent first."""
+    rows = conn.execute(
+        "SELECT * FROM pipeline_runs ORDER BY id DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_stale_leads(conn: sqlite3.Connection, cutoff: datetime) -> list[Lead]:
+    """Return scored leads whose enriched_at is older than the cutoff.
+
+    Useful for identifying leads that need re-enrichment.
+    """
+    rows = conn.execute(
+        "SELECT * FROM leads WHERE score IS NOT NULL AND enriched_at < ?",
+        (cutoff.isoformat(),),
+    ).fetchall()
+    return [_row_to_lead(row) for row in rows]
