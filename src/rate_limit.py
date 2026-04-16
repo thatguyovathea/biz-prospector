@@ -6,6 +6,7 @@ Prevents hitting rate limits and handles transient failures.
 
 from __future__ import annotations
 
+import inspect
 import time
 import asyncio
 from collections import defaultdict
@@ -110,7 +111,7 @@ def rate_limited(service: str):
             await limiter.async_wait()
             return await func(*args, **kwargs)
 
-        if asyncio.iscoroutinefunction(func):
+        if inspect.iscoroutinefunction(func):
             return async_wrapper
         return wrapper
 
