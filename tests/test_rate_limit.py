@@ -23,6 +23,12 @@ class TestRateLimiter:
         limiter.wait()
         limiter.wait()
         assert len(limiter._timestamps) == 2
+        # A third call must trigger a sleep because the per-minute window is full
+        with patch("time.sleep") as mock_sleep:
+            limiter.wait()
+            mock_sleep.assert_called()
+            # The sleep duration must be positive (waiting out the window)
+            assert mock_sleep.call_args[0][0] > 0
 
     @pytest.mark.asyncio
     async def test_async_wait(self):

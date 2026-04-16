@@ -1,10 +1,12 @@
 """Tests for the pipeline CLI orchestrator."""
 
 import json
+from io import StringIO
 from unittest.mock import patch, MagicMock
 
 import pytest
 from click.testing import CliRunner
+from rich.console import Console
 
 from src.pipeline import (
     cli,
@@ -97,18 +99,32 @@ class TestPrintTopLeads:
             make_lead(score=80.0, has_crm=False, has_chat_widget=True, has_scheduling=None),
             make_lead(score=None, has_crm=None),
         ]
-        # Should not raise
-        _print_top_leads(leads, n=5)
+        buf = StringIO()
+        c = Console(file=buf, highlight=False)
+        import src.pipeline as _pl
+        original_console = _pl.console
+        _pl.console = c
+        try:
+            result = _print_top_leads(leads, n=5)
+        finally:
+            _pl.console = original_console
+        output = buf.getvalue()
+        assert "80.0" in output
+        assert result is None
 
 
 class TestScrapeCommand:
     def test_scrape_cli(self, runner, sample_settings, tmp_path):
         mock_leads = [make_lead(id="s1")]
         with patch("src.pipeline.load_settings", return_value=sample_settings), \
-             patch("src.pipeline.scrape_google_maps", return_value=mock_leads), \
+             patch("src.pipeline.scrape_google_maps", return_value=mock_leads) as mock_scrape, \
              patch("src.pipeline._save_json"):
             result = runner.invoke(cli, ["scrape", "--vertical", "hvac", "--metro", "portland-or"])
         assert result.exit_code == 0
+        mock_scrape.assert_called_once()
+        call_args = mock_scrape.call_args
+        assert call_args[0][0] == "hvac"
+        assert call_args[0][1] == "portland-or"
 
 
 class TestEnrichCommand:
@@ -122,6 +138,7 @@ class TestEnrichCommand:
             mock_audit.return_value = MagicMock()
             result = runner.invoke(cli, ["enrich", "--input", leads_json_file])
         assert result.exit_code == 0
+        assert "Enriching" in result.output
 
     def test_enrich_handles_review_exception(self, runner, sample_settings, tmp_path):
         leads = [make_lead(id="l1", place_id="place_abc", website="").model_dump(mode="json")]
@@ -134,6 +151,7 @@ class TestEnrichCommand:
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["enrich", "--input", str(path)])
         assert result.exit_code == 0
+        assert "failed" in result.output.lower()
 
     def test_enrich_handles_job_search_exception(self, runner, sample_settings, tmp_path):
         leads = [make_lead(id="l1", place_id="", website="").model_dump(mode="json")]
@@ -145,6 +163,7 @@ class TestEnrichCommand:
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["enrich", "--input", str(path)])
         assert result.exit_code == 0
+        assert "failed" in result.output.lower()
 
 
 class TestScoreCommand:
@@ -153,20 +172,23 @@ class TestScoreCommand:
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["score", "--input", leads_json_file])
         assert result.exit_code == 0
+        assert "above threshold" in result.output
 
     def test_score_with_threshold(self, runner, leads_json_file, sample_settings, tmp_path):
         with patch("src.pipeline.load_settings", return_value=sample_settings), \
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["score", "--input", leads_json_file, "--threshold", "80"])
         assert result.exit_code == 0
+        assert "above threshold" in result.output
 
 
 class TestOutreachCommand:
     def test_outreach_cli(self, runner, leads_json_file, sample_settings, tmp_path):
-        with patch("src.pipeline.generate_batch_outreach", side_effect=lambda leads, **kw: leads), \
+        with patch("src.pipeline.generate_batch_outreach", side_effect=lambda leads, **kw: leads) as mock_batch, \
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["outreach", "--input", leads_json_file])
         assert result.exit_code == 0
+        mock_batch.assert_called_once()
 
 
 class TestReportCommand:
@@ -177,11 +199,13 @@ class TestReportCommand:
                 "--vertical", "hvac", "--metro", "portland-or",
             ])
         assert result.exit_code == 0
+        assert "Report saved" in result.output
 
     def test_report_no_vertical(self, runner, leads_json_file, tmp_path):
         with patch("src.pipeline.save_report", return_value=tmp_path / "report.html"):
             result = runner.invoke(cli, ["report", "--input", leads_json_file])
         assert result.exit_code == 0
+        assert "Report saved" in result.output
 
 
 class TestStatsCommand:
@@ -356,6 +380,7 @@ class TestReEnrichCommand:
              patch("src.pipeline.DATA_DIR", tmp_path):
             result = runner.invoke(cli, ["re-enrich"])
         assert result.exit_code == 0
+        assert "Re-enriching" in result.output
 
     def test_skips_fresh_leads(self, runner, sample_settings, tmp_path):
         from datetime import datetime, timezone
@@ -477,3 +502,4 @@ class TestScheduleCommands:
         with patch("src.pipeline.remove_jobs", return_value=0):
             result = runner.invoke(cli, ["schedule", "remove"], input="y\n")
         assert result.exit_code == 0
+        assert "No scheduled jobs" in result.output

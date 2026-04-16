@@ -102,7 +102,8 @@ class TestManualJobPostingsFactor:
         lead = make_lead(active_job_postings=5, manual_process_postings=1)
         score_lead(lead)
         score = lead.score_breakdown["manual_job_postings"]
-        assert 0 < score < 1
+        # manual_process_postings=1 → _normalize(1, 0, 3) ≈ 0.333
+        assert score == pytest.approx(0.333, abs=0.05)
 
     def test_many_manual_postings(self):
         lead = make_lead(active_job_postings=10, manual_process_postings=5)
@@ -125,7 +126,8 @@ class TestNegativeReviewsFactor:
         lead = make_lead(reviews_analyzed=100, ops_complaint_count=2)
         score_lead(lead)
         score = lead.score_breakdown["negative_reviews_ops"]
-        assert 0 < score < 1
+        # complaint_ratio = 2/100 = 0.02 → _normalize(0.02, 0, 0.15) ≈ 0.133
+        assert score == pytest.approx(0.133, abs=0.05)
 
     def test_no_reviews(self):
         lead = make_lead(reviews_analyzed=0, ops_complaint_count=0)
@@ -232,12 +234,15 @@ class TestVerticalOverrides:
             scored = score_leads(leads, vertical="hvac")
         assert len(scored) == 1
         assert scored[0].score is not None
+        assert scored[0].score > 0
 
     def test_no_vertical_uses_defaults(self, sample_settings):
         leads = [make_lead()]
         with patch("src.scoring.score.load_settings", return_value=sample_settings):
             scored = score_leads(leads, vertical=None)
         assert len(scored) == 1
+        assert scored[0].score is not None
+        assert "website_outdated" in scored[0].score_breakdown
 
     def test_sorted_descending(self, sample_settings):
         leads = [
@@ -254,7 +259,8 @@ class TestEmployeeTitleSignalsFactor:
         lead = make_lead(employee_titles=["Owner", "Data Entry Clerk", "Receptionist"],
                          manual_role_count=2, tech_role_count=0)
         score_lead(lead)
-        assert lead.score_breakdown["employee_title_signals"] > 0
+        # manual_role_count=2 → _normalize(2, 0, 5) = 0.4
+        assert lead.score_breakdown["employee_title_signals"] == pytest.approx(0.4, abs=0.05)
 
     def test_tech_roles_present(self):
         lead = make_lead(employee_titles=["Owner", "IT Manager"],

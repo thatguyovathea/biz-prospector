@@ -112,7 +112,12 @@ class TestComposeSummaryHtml:
             "is_re_enrich": False,
         }
         html = compose_summary_html([], run_info)
-        assert "0" in html
+        # The summary should explicitly report zero qualified leads, not just contain "0"
+        assert "Qualified:" in html or "qualified" in html.lower()
+        # The scraped count (50) must appear so the run stats are present
+        assert "50" in html
+        # No lead rows should be present
+        assert "Acme" not in html
 
 
 class TestSendRunSummary:

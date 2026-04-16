@@ -1,6 +1,7 @@
 """Tests for deduplication logic."""
 
 import json
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -47,6 +48,9 @@ class TestMarkProcessed:
         data = json.loads(dedup_file.read_text())
         assert "lead1" in data
         assert "lead2" in data
+        # Values must be valid ISO-format timestamps
+        datetime.fromisoformat(data["lead1"])
+        datetime.fromisoformat(data["lead2"])
 
     def test_appends_to_existing(self, tmp_data_dir):
         dedup_dir = tmp_data_dir / "data" / ".dedup"

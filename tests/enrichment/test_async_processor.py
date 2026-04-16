@@ -19,16 +19,22 @@ class TestEnrichLeadsAsync:
     async def test_enriches_all_leads(self, mock_settings):
         leads = [make_lead(id="l1", website=""), make_lead(id="l2", website="")]
 
-        with patch("src.enrichment.async_processor.audit_website"), \
-             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
-             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
-             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
+        with patch("src.enrichment.async_processor.audit_website") as mock_audit, \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit") as mock_enrich_audit, \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]) as mock_reviews, \
+             patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]) as mock_jobs, \
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts") as mock_contacts:
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 2
         for lead in results:
             assert lead.enriched_at is not None
+        # Leads have no website so audit is skipped, but reviews/jobs/contacts run per lead
+        mock_reviews.assert_called()
+        mock_jobs.assert_called()
+        mock_contacts.assert_called()
+        assert mock_reviews.call_count == 2
+        assert mock_jobs.call_count == 2
 
     @pytest.mark.asyncio
     async def test_preserves_order(self, mock_settings):
@@ -48,14 +54,20 @@ class TestEnrichLeadsAsync:
     async def test_failure_doesnt_block_others(self, mock_settings):
         leads = [make_lead(id="good", website=""), make_lead(id="also_good", website="")]
 
+        # First call raises, second call succeeds — the second lead must still be processed
+        mock_reviews = MagicMock(side_effect=[Exception("API down"), []])
+
         with patch("src.enrichment.async_processor.audit_website"), \
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
-             patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
+             patch("src.enrichment.async_processor.fetch_reviews_outscraper", mock_reviews), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
              patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 2
+        # Both leads completed enrichment despite the first review fetch failing
+        for lead in results:
+            assert lead.enriched_at is not None
 
     @pytest.mark.asyncio
     async def test_calls_audit_with_builtwith_key(self, mock_settings):
@@ -64,7 +76,7 @@ class TestEnrichLeadsAsync:
         mock_audit = MagicMock()
 
         with patch("src.enrichment.async_processor.audit_website", mock_audit), \
-             patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_audit") as mock_enrich_audit, \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
              patch("src.enrichment.async_processor.enrich_lead_with_contacts"), \
@@ -73,6 +85,9 @@ class TestEnrichLeadsAsync:
 
         assert len(results) == 1
         assert results[0].enriched_at is not None
+        # Lead has a website so audit_website must have been called
+        mock_audit.assert_called_once()
+        mock_enrich_audit.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_skips_website_audit_for_no_website(self, mock_settings):
