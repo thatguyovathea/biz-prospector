@@ -17,24 +17,6 @@ console = Console()
 
 BUILTWITH_API_URL = "https://api.builtwith.com/v22/api.json"
 
-# Map BuiltWith tags to our normalized category names
-TAG_TO_CATEGORY = {
-    "cms": "cms",
-    "ecommerce": "ecommerce",
-    "analytics": "analytics",
-    "widgets": "widgets",
-    "cdn": "cdn",
-    "hosting": "hosting",
-    "javascript-framework": "javascript_framework",
-    "web-framework": "web_framework",
-    "marketing-automation": "marketing_automation",
-    "ssl": "ssl",
-    "web-server": "web_server",
-    "payment": "payment",
-    "advertising": "advertising",
-    "email": "email",
-}
-
 
 def _normalize_tech_name(name: str) -> str:
     """Normalize a technology name to a lowercase slug.

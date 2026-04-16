@@ -55,7 +55,6 @@ def score_lead(lead: Lead, weights: dict[str, float] | None = None) -> Lead:
         website_score += 0.4
     if lead.tech_stack:
         # Penalize if using very old tech
-        old_tech = {"wordpress"}  # WP alone isn't bad, but combined with other signals
         # Bonus if no modern framework detected
         modern = {"react", "angular", "vue", "tailwind"}
         if not any(t in modern for t in lead.tech_stack):

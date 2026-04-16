@@ -13,12 +13,6 @@ from dataclasses import dataclass, field
 from functools import wraps
 from typing import Callable, Any
 
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
 import httpx
 from rich.console import Console
 
@@ -121,20 +115,6 @@ def rate_limited(service: str):
         return wrapper
 
     return decorator
-
-
-# Retry decorator for transient HTTP failures
-retry_on_http_error = retry(
-    retry=retry_if_exception_type(
-        (httpx.TimeoutException, httpx.HTTPStatusError)
-    ),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    before_sleep=lambda retry_state: console.print(
-        f"    [yellow]Retry {retry_state.attempt_number}/3 "
-        f"after {retry_state.outcome.exception().__class__.__name__}[/]"
-    ),
-)
 
 
 def retry_with_rate_limit(service: str, max_attempts: int = 3):
