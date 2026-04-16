@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from src.config import load_settings
+from src.config import load_settings, get_scoring_keywords
 from src.models import Lead
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
 from src.enrichment.contacts import enrich_lead_with_contacts, _extract_domain
@@ -125,10 +125,11 @@ async def enrich_leads_async(
         max_concurrent: Max simultaneous enrichment tasks.
     """
     settings = load_settings()
-    complaint_kw = settings.get("scoring", {}).get("ops_complaint_keywords", [])
-    manual_kw = settings.get("scoring", {}).get("manual_process_keywords", [])
-    manual_role_kw = settings.get("scoring", {}).get("manual_role_keywords", [])
-    tech_role_kw = settings.get("scoring", {}).get("tech_role_keywords", [])
+    kw = get_scoring_keywords(settings)
+    complaint_kw = kw["ops_complaint_keywords"]
+    manual_kw = kw["manual_process_keywords"]
+    manual_role_kw = kw["manual_role_keywords"]
+    tech_role_kw = kw["tech_role_keywords"]
     semaphore = asyncio.Semaphore(max_concurrent)
 
     console.print(

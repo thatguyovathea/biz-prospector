@@ -115,40 +115,59 @@ def _make_id(name: str, address: str) -> str:
     return hashlib.md5(raw.encode()).hexdigest()[:12]
 
 
-def parse_serpapi_result(item: dict, metro: str) -> Lead:
-    """Convert a SerpAPI result to a Lead."""
+_SERPAPI_FIELDS = {
+    "website": "website",
+    "category": "type",
+    "rating": "rating",
+    "review_count": "reviews",
+    "place_id": "place_id",
+}
+
+_APIFY_FIELDS = {
+    "website": ("website", "url"),  # fallback chain
+    "category": "categoryName",
+    "rating": "totalScore",
+    "review_count": "reviewsCount",
+    "place_id": "placeId",
+}
+
+
+def _parse_result(item: dict, metro: str, field_map: dict) -> Lead:
+    """Convert a raw scraper result to a Lead using provider-specific field mappings."""
+    def _get(key: str) -> str | int | float | None:
+        mapping = field_map.get(key, key)
+        if isinstance(mapping, tuple):
+            for m in mapping:
+                val = item.get(m)
+                if val is not None:
+                    return val
+            return ""
+        return item.get(mapping) if isinstance(mapping, str) else None
+
     return Lead(
         id=_make_id(item.get("title", ""), item.get("address", "")),
         business_name=item.get("title", ""),
         address=item.get("address", ""),
         phone=item.get("phone", ""),
-        website=item.get("website", ""),
-        category=item.get("type", ""),
+        website=_get("website") or "",
+        category=_get("category") or "",
         metro=metro,
         source=LeadSource.GOOGLE_MAPS,
-        rating=item.get("rating"),
-        review_count=item.get("reviews"),
-        place_id=item.get("place_id", ""),
+        rating=_get("rating"),
+        review_count=_get("review_count"),
+        place_id=_get("place_id") or "",
         scraped_at=datetime.now(timezone.utc),
     )
+
+
+def parse_serpapi_result(item: dict, metro: str) -> Lead:
+    """Convert a SerpAPI result to a Lead."""
+    return _parse_result(item, metro, _SERPAPI_FIELDS)
 
 
 def parse_apify_result(item: dict, metro: str) -> Lead:
     """Convert an Apify result to a Lead."""
-    return Lead(
-        id=_make_id(item.get("title", ""), item.get("address", "")),
-        business_name=item.get("title", ""),
-        address=item.get("address", ""),
-        phone=item.get("phone", ""),
-        website=item.get("website", item.get("url", "")),
-        category=item.get("categoryName", ""),
-        metro=metro,
-        source=LeadSource.GOOGLE_MAPS,
-        rating=item.get("totalScore"),
-        review_count=item.get("reviewsCount"),
-        place_id=item.get("placeId", ""),
-        scraped_at=datetime.now(timezone.utc),
-    )
+    return _parse_result(item, metro, _APIFY_FIELDS)
 
 
 def scrape_google_maps(

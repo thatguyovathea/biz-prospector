@@ -14,7 +14,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from src.config import load_settings
+from src.config import load_settings, get_scoring_keywords
 from src.models import Lead
 from src.scrapers.google_maps import scrape_google_maps
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
@@ -112,8 +112,9 @@ def enrich(input_path: str):
     leads = _load_leads(input_path)
     console.print(f"[bold]Enriching {len(leads)} leads[/]")
 
-    complaint_kw = settings.get("scoring", {}).get("ops_complaint_keywords", [])
-    manual_kw = settings.get("scoring", {}).get("manual_process_keywords", [])
+    kw = get_scoring_keywords(settings)
+    complaint_kw = kw["ops_complaint_keywords"]
+    manual_kw = kw["manual_process_keywords"]
 
     for i, lead in enumerate(leads):
         console.print(f"  [{i + 1}/{len(leads)}] {lead.business_name}")

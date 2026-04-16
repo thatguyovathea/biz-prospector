@@ -40,3 +40,14 @@ def get_api_key(settings: dict[str, Any], key_name: str) -> str:
             f"API key '{key_name}' not set in config/settings.yaml"
         )
     return key
+
+
+def get_scoring_keywords(settings: dict[str, Any]) -> dict[str, list[str]]:
+    """Extract all scoring keyword lists from settings."""
+    scoring = settings.get("scoring", {})
+    return {
+        "ops_complaint_keywords": scoring.get("ops_complaint_keywords", []),
+        "manual_process_keywords": scoring.get("manual_process_keywords", []),
+        "manual_role_keywords": scoring.get("manual_role_keywords", []),
+        "tech_role_keywords": scoring.get("tech_role_keywords", []),
+    }
