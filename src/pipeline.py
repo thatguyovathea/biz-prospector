@@ -126,7 +126,7 @@ def enrich(input_path: str):
         # Reviews (if we have a place_id and outscraper key)
         if lead.place_id:
             try:
-                outscraper_key = settings["apis"].get("outscraper_key", "")
+                outscraper_key = settings.get("apis", {}).get("outscraper_key", "")
                 if outscraper_key:
                     reviews = fetch_reviews_outscraper(
                         lead.place_id, outscraper_key
@@ -138,7 +138,7 @@ def enrich(input_path: str):
 
         # Job postings
         try:
-            serpapi_key = settings["apis"].get("serpapi_key", "")
+            serpapi_key = settings.get("apis", {}).get("serpapi_key", "")
             if serpapi_key:
                 postings = search_jobs_serpapi(
                     lead.business_name, lead.metro, serpapi_key

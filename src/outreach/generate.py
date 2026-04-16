@@ -149,7 +149,7 @@ def generate_outreach(
         lead.contacted_at = datetime.now(timezone.utc)
 
     except Exception as e:
-        console.print(f"[red]Failed to generate outreach for {lead.business_name}: {e}[/]")
+        console.print(f"[yellow]Outreach generation failed for {lead.business_name}: {e}[/]")
 
     return lead
 

@@ -62,7 +62,7 @@ class AuditResult:
     reachable: bool = False
     has_ssl: bool = False
     has_crm: bool = False
-    has_chat: bool = False
+    has_chat_widget: bool = False
     has_scheduling: bool = False
     is_mobile_responsive: bool = False
     outdated_signals_found: list[str] | None = None
@@ -162,7 +162,7 @@ def audit_website(
             soup = BeautifulSoup(html, "html.parser")
 
             result.has_crm = _check_patterns(html, CRM_PATTERNS)
-            result.has_chat = _check_patterns(html, CHAT_PATTERNS)
+            result.has_chat_widget = _check_patterns(html, CHAT_PATTERNS)
             result.has_scheduling = _check_patterns(html, SCHEDULING_PATTERNS)
             result.is_mobile_responsive = _check_mobile_responsive(soup)
             result.outdated_signals_found = _find_outdated_signals(html)
@@ -191,7 +191,7 @@ def audit_website(
 def enrich_lead_with_audit(lead: Lead, audit: AuditResult) -> Lead:
     """Apply audit results to a Lead object."""
     lead.has_crm = audit.has_crm
-    lead.has_chat_widget = audit.has_chat
+    lead.has_chat_widget = audit.has_chat_widget
     lead.has_scheduling = audit.has_scheduling
     lead.has_ssl = audit.has_ssl
     lead.is_mobile_responsive = audit.is_mobile_responsive

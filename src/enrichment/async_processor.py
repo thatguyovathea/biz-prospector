@@ -15,7 +15,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from src.config import load_settings
 from src.models import Lead
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
-from src.enrichment.contacts import enrich_lead_contacts, _extract_domain
+from src.enrichment.contacts import enrich_lead_with_contacts, _extract_domain
 from src.enrichment.linkedin import fetch_company_employees, enrich_lead_with_titles
 from src.scrapers.reviews import (
     fetch_reviews_outscraper,
@@ -91,7 +91,7 @@ async def _enrich_single(
                 contact_limiter = get_limiter("apollo" if apollo_key else "hunter")
                 await contact_limiter.async_wait()
                 await loop.run_in_executor(
-                    None, enrich_lead_contacts, lead, apollo_key, hunter_key, True
+                    None, enrich_lead_with_contacts, lead, apollo_key, hunter_key, True
                 )
             except Exception as e:
                 console.print(f"    [yellow]Contact enrichment failed for {lead.business_name}: {e}[/]")

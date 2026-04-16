@@ -164,7 +164,7 @@ class TestAuditWebsite:
         assert result.reachable is True
         assert result.has_ssl is True
         assert result.has_crm is True
-        assert result.has_chat is True
+        assert result.has_chat_widget is True
         assert result.has_scheduling is True
         assert result.is_mobile_responsive is True
         assert "wordpress" in result.detected_tech
@@ -179,7 +179,7 @@ class TestAuditWebsite:
         result = audit_website("https://baresite.com")
         assert result.reachable is True
         assert result.has_crm is False
-        assert result.has_chat is False
+        assert result.has_chat_widget is False
         assert result.has_scheduling is False
         assert result.is_mobile_responsive is False
 
@@ -270,7 +270,7 @@ class TestEnrichLeadWithAudit:
             reachable=True,
             has_ssl=True,
             has_crm=True,
-            has_chat=False,
+            has_chat_widget=False,
             has_scheduling=True,
             is_mobile_responsive=True,
             detected_tech=["wordpress", "react"],

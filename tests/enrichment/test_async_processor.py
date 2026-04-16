@@ -23,7 +23,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 2
@@ -38,7 +38,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         result_ids = [l.id for l in results]
@@ -52,7 +52,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 2
@@ -67,7 +67,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"), \
              patch("src.enrichment.async_processor.fetch_company_employees", return_value={"titles": [], "employee_count": None, "founded_year": None, "company_linkedin_url": ""}):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
@@ -84,7 +84,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit") as mock_enrich, \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         mock_audit.assert_not_called()
@@ -99,7 +99,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", side_effect=Exception("API down")), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 1
@@ -114,7 +114,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", side_effect=Exception("SerpAPI down")), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 1
@@ -129,7 +129,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts", side_effect=Exception("Apollo down")):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts", side_effect=Exception("Apollo down")):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
         assert len(results) == 1
@@ -143,7 +143,7 @@ class TestEnrichLeadsAsync:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"):
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"):
             results = run_async_enrichment(leads, max_concurrent=2)
 
         assert len(results) == 1
@@ -165,7 +165,7 @@ class TestLinkedInEnrichment:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"), \
              patch("src.enrichment.async_processor.fetch_company_employees", mock_fetch), \
              patch("src.enrichment.async_processor.enrich_lead_with_titles") as mock_enrich:
             results = await enrich_leads_async(leads, max_concurrent=2)
@@ -181,7 +181,7 @@ class TestLinkedInEnrichment:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"), \
              patch("src.enrichment.async_processor.fetch_company_employees", side_effect=Exception("Apollo down")):
             results = await enrich_leads_async(leads, max_concurrent=2)
 
@@ -197,7 +197,7 @@ class TestLinkedInEnrichment:
              patch("src.enrichment.async_processor.enrich_lead_with_audit"), \
              patch("src.enrichment.async_processor.fetch_reviews_outscraper", return_value=[]), \
              patch("src.enrichment.async_processor.search_jobs_serpapi", return_value=[]), \
-             patch("src.enrichment.async_processor.enrich_lead_contacts"), \
+             patch("src.enrichment.async_processor.enrich_lead_with_contacts"), \
              patch("src.enrichment.async_processor.fetch_company_employees", mock_fetch):
             results = await enrich_leads_async(leads, max_concurrent=2)
 

@@ -12,7 +12,7 @@ from src.enrichment.contacts import (
     _title_priority,
     _pick_best_contact,
     _extract_domain,
-    enrich_lead_contacts,
+    enrich_lead_with_contacts,
 )
 from tests.conftest import make_lead
 
@@ -159,7 +159,7 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake-key")
+        enrich_lead_with_contacts(lead, apollo_key="fake-key")
         assert lead.contact_name == "Bob Owner"
         assert lead.contact_email == "bob@acme.com"
         assert lead.contact_title == "Owner"
@@ -186,13 +186,13 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake-key", hunter_key="fake-key")
+        enrich_lead_with_contacts(lead, apollo_key="fake-key", hunter_key="fake-key")
         assert lead.contact_name == "Jane Fallback"
         assert lead.contact_email == "jane@acme.com"
 
     def test_no_keys_no_enrichment(self):
         lead = make_lead()
-        enrich_lead_contacts(lead)
+        enrich_lead_with_contacts(lead)
         assert lead.contact_name == ""
         assert lead.contact_email == ""
 
@@ -215,7 +215,7 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake")
         assert lead.contact_name == "Hunter Result"
         assert lead.contact_email == "hunter@acme.com"
 
@@ -229,7 +229,7 @@ class TestEnrichLeadContacts:
             side_effect=httpx.TimeoutException("timeout")
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake")
         assert lead.contact_name == ""
 
     @respx.mock
@@ -253,7 +253,7 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
         assert lead.contact_name == "Bob Test"
         assert lead.contact_email == ""
 
@@ -278,7 +278,7 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
         assert lead.contact_email == "bob@valid.com"
 
     @respx.mock
@@ -300,7 +300,7 @@ class TestEnrichLeadContacts:
             side_effect=httpx.TimeoutException("timeout")
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake", verify=True)
         assert lead.contact_email == "bob@acme.com"
 
     @respx.mock
@@ -319,7 +319,7 @@ class TestEnrichLeadContacts:
             })
         )
         lead = make_lead(website="")
-        enrich_lead_contacts(lead, apollo_key="fake")
+        enrich_lead_with_contacts(lead, apollo_key="fake")
         assert lead.contact_name == "Alice Owner"
 
 
@@ -339,7 +339,7 @@ class TestLinkedInUrlCapture:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake-key")
+        enrich_lead_with_contacts(lead, apollo_key="fake-key")
         assert lead.linkedin_url == "https://linkedin.com/in/bobowner"
 
     @respx.mock
@@ -361,5 +361,5 @@ class TestLinkedInUrlCapture:
             })
         )
         lead = make_lead(website="https://acmehvac.com")
-        enrich_lead_contacts(lead, apollo_key="fake", hunter_key="fake")
+        enrich_lead_with_contacts(lead, apollo_key="fake", hunter_key="fake")
         assert lead.linkedin_url == "https://linkedin.com/in/janedoe"

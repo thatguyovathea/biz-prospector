@@ -171,7 +171,7 @@ def _pick_best_contact(people: list[dict]) -> dict | None:
     return with_email[0]
 
 
-def enrich_lead_contacts(
+def enrich_lead_with_contacts(
     lead: Lead,
     apollo_key: str = "",
     hunter_key: str = "",

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -87,8 +88,6 @@ def scrape_apify(
         console.print(f"  Apify run started: {run_id}", style="dim")
 
         # Poll until finished (simplified — production would use webhooks)
-        import time
-
         for _ in range(60):  # 5 min timeout
             status_resp = client.get(
                 f"https://api.apify.com/v2/actor-runs/{run_id}",
