@@ -66,8 +66,8 @@ async def _enrich_single(
                 )
                 analysis = analyze_reviews(reviews, complaint_kw)
                 enrich_lead_with_reviews(lead, analysis)
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"    [yellow]Review fetch failed for {lead.business_name}: {e}[/]")
 
         # Job postings
         serpapi_key = settings.get("apis", {}).get("serpapi_key", "")
@@ -80,8 +80,8 @@ async def _enrich_single(
                 )
                 job_analysis = analyze_job_postings(postings, manual_kw)
                 enrich_lead_with_jobs(lead, job_analysis)
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"    [yellow]Job search failed for {lead.business_name}: {e}[/]")
 
         # Contact enrichment
         apollo_key = settings.get("apis", {}).get("apollo_key", "")
@@ -93,8 +93,8 @@ async def _enrich_single(
                 await loop.run_in_executor(
                     None, enrich_lead_contacts, lead, apollo_key, hunter_key, True
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"    [yellow]Contact enrichment failed for {lead.business_name}: {e}[/]")
 
         # Employee title analysis (uses Apollo People Search — free endpoint)
         if apollo_key and lead.website:
@@ -107,8 +107,8 @@ async def _enrich_single(
                         None, fetch_company_employees, domain, apollo_key
                     )
                     enrich_lead_with_titles(lead, employees, manual_role_kw, tech_role_kw)
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"    [yellow]Title analysis failed for {lead.business_name}: {e}[/]")
 
         lead.enriched_at = datetime.now(timezone.utc)
         return lead

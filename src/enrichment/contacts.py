@@ -218,7 +218,7 @@ def enrich_lead_contacts(
                 if result["status"] == "invalid":
                     console.print(f"    [yellow]Email invalid, clearing: {lead.contact_email}[/]")
                     lead.contact_email = ""
-            except Exception:
-                pass
+            except Exception as e:
+                console.print(f"    [yellow]Email verification failed: {e}[/]")
 
     return lead
