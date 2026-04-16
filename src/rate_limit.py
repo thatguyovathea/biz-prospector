@@ -33,41 +33,32 @@ class RateLimiter:
     calls_per_minute: int = 30
     _timestamps: list[float] = field(default_factory=list)
 
-    def wait(self):
-        """Block until we're under the rate limit."""
+    def _compute_sleep_time(self) -> float:
+        """Purge stale timestamps and return required sleep duration."""
         now = time.monotonic()
         window = 60.0
-
-        # Purge old timestamps
         self._timestamps = [
             t for t in self._timestamps if now - t < window
         ]
-
         if len(self._timestamps) >= self.calls_per_minute:
-            # Wait until the oldest call falls out of the window
             sleep_time = window - (now - self._timestamps[0]) + 0.1
-            if sleep_time > 0:
-                console.print(
-                    f"    [dim]Rate limit: sleeping {sleep_time:.1f}s[/]"
-                )
-                time.sleep(sleep_time)
+            return max(sleep_time, 0.0)
+        return 0.0
 
+    def wait(self):
+        """Block until we're under the rate limit."""
+        sleep_time = self._compute_sleep_time()
+        if sleep_time > 0:
+            console.print(f"    [dim]Rate limit: sleeping {sleep_time:.1f}s[/]")
+            time.sleep(sleep_time)
         self._timestamps.append(time.monotonic())
 
     async def async_wait(self):
         """Async version of wait."""
-        now = time.monotonic()
-        window = 60.0
-
-        self._timestamps = [
-            t for t in self._timestamps if now - t < window
-        ]
-
-        if len(self._timestamps) >= self.calls_per_minute:
-            sleep_time = window - (now - self._timestamps[0]) + 0.1
-            if sleep_time > 0:
-                await asyncio.sleep(sleep_time)
-
+        sleep_time = self._compute_sleep_time()
+        if sleep_time > 0:
+            console.print(f"    [dim]Rate limit: sleeping {sleep_time:.1f}s[/]")
+            await asyncio.sleep(sleep_time)
         self._timestamps.append(time.monotonic())
 
 

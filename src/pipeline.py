@@ -16,7 +16,7 @@ from rich.table import Table
 
 from src.config import load_settings
 from src.models import Lead
-from src.scrapers.google_maps import scrape_google_maps, save_leads
+from src.scrapers.google_maps import scrape_google_maps
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
 from src.scrapers.reviews import (
     fetch_reviews_outscraper,
@@ -101,7 +101,7 @@ def scrape(vertical: str, metro: str, count: int, provider: str):
     """Stage 1: Scrape business listings from Google Maps."""
     leads = scrape_google_maps(vertical, metro, count, provider)
     slug = f"{vertical}_{metro}_{datetime.now().strftime('%Y%m%d')}"
-    save_leads(leads, f"{slug}.json")
+    _save_json(leads, "raw", f"{slug}.json")
 
 
 @cli.command()

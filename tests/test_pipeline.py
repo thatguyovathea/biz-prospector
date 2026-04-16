@@ -106,7 +106,7 @@ class TestScrapeCommand:
         mock_leads = [make_lead(id="s1")]
         with patch("src.pipeline.load_settings", return_value=sample_settings), \
              patch("src.pipeline.scrape_google_maps", return_value=mock_leads), \
-             patch("src.pipeline.save_leads"):
+             patch("src.pipeline._save_json"):
             result = runner.invoke(cli, ["scrape", "--vertical", "hvac", "--metro", "portland-or"])
         assert result.exit_code == 0
 
