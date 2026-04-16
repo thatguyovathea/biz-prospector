@@ -110,3 +110,125 @@ def get_db(path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(_SCHEMA)
     return conn
+
+
+# ---------------------------------------------------------------------------
+# Lead <-> row serialization
+# ---------------------------------------------------------------------------
+
+# Stable column order for INSERT statements (must match leads table).
+_LEAD_FIELDS = [
+    "id", "business_name", "address", "phone", "website", "category",
+    "metro", "source", "rating", "review_count", "place_id",
+    "tech_stack", "has_crm", "has_chat_widget", "has_scheduling",
+    "has_ssl", "is_mobile_responsive", "page_speed_score",
+    "reviews_analyzed", "ops_complaint_count", "ops_complaint_samples",
+    "owner_response_rate", "active_job_postings", "manual_process_postings",
+    "manual_process_titles", "contact_name", "contact_email", "contact_title",
+    "linkedin_url", "company_linkedin_url", "employee_count", "founded_year",
+    "employee_titles", "manual_role_count", "tech_role_count",
+    "score", "score_breakdown", "outreach_email", "followups",
+    "scraped_at", "enriched_at", "scored_at", "contacted_at",
+    "last_run_id",
+]
+
+_JSON_LIST_FIELDS = frozenset({
+    "tech_stack", "ops_complaint_samples", "manual_process_titles",
+    "employee_titles", "followups",
+})
+_JSON_DICT_FIELDS = frozenset({"score_breakdown"})
+_BOOL_FIELDS = frozenset({
+    "has_crm", "has_chat_widget", "has_scheduling",
+    "has_ssl", "is_mobile_responsive",
+})
+_DATETIME_FIELDS = frozenset({
+    "scraped_at", "enriched_at", "scored_at", "contacted_at",
+})
+
+
+def _bool_to_int(val: bool | None) -> int | None:
+    if val is None:
+        return None
+    return 1 if val else 0
+
+
+def _int_to_bool(val: int | None) -> bool | None:
+    if val is None:
+        return None
+    return bool(val)
+
+
+def _lead_to_row(lead: Lead) -> tuple:
+    """Convert a Lead model to a tuple of SQLite-compatible values."""
+    values = []
+    for field in _LEAD_FIELDS:
+        val = getattr(lead, field, None)
+        if field in _JSON_LIST_FIELDS or field in _JSON_DICT_FIELDS:
+            val = json.dumps(val)
+        elif field in _BOOL_FIELDS:
+            val = _bool_to_int(val)
+        elif field == "source":
+            val = val.value if val is not None else "google_maps"
+        elif field in _DATETIME_FIELDS:
+            val = val.isoformat() if val is not None else None
+        values.append(val)
+    return tuple(values)
+
+
+def _row_to_lead(row: sqlite3.Row) -> Lead:
+    """Convert a sqlite3.Row back to a Lead model."""
+    data = {}
+    for field in _LEAD_FIELDS:
+        val = row[field]
+        if field in _JSON_LIST_FIELDS or field in _JSON_DICT_FIELDS:
+            val = json.loads(val) if val is not None else ([] if field in _JSON_LIST_FIELDS else {})
+        elif field in _BOOL_FIELDS:
+            val = _int_to_bool(val)
+        elif field == "source":
+            val = LeadSource(val) if val is not None else LeadSource.GOOGLE_MAPS
+        elif field in _DATETIME_FIELDS:
+            val = datetime.fromisoformat(val) if val is not None else None
+        data[field] = val
+    # last_run_id is not a Lead field, drop it
+    data.pop("last_run_id", None)
+    return Lead(**data)
+
+
+# ---------------------------------------------------------------------------
+# CRUD operations
+# ---------------------------------------------------------------------------
+
+_PLACEHOLDERS = ", ".join(["?"] * len(_LEAD_FIELDS))
+_COLUMNS = ", ".join(_LEAD_FIELDS)
+_UPSERT_SQL = f"INSERT OR REPLACE INTO leads ({_COLUMNS}) VALUES ({_PLACEHOLDERS})"
+
+
+def upsert_leads(conn: sqlite3.Connection, leads: list[Lead], run_id: int | None = None) -> int:
+    """Insert or update leads in the database.
+
+    Args:
+        conn: Database connection.
+        leads: List of Lead models to upsert.
+        run_id: Optional pipeline run ID to tag on each lead.
+
+    Returns:
+        Number of leads upserted.
+    """
+    rows = []
+    for lead in leads:
+        row = list(_lead_to_row(lead))
+        # last_run_id is the last field
+        if run_id is not None:
+            row[-1] = run_id
+        rows.append(tuple(row))
+    conn.executemany(_UPSERT_SQL, rows)
+    conn.commit()
+    return len(rows)
+
+
+def get_lead(conn: sqlite3.Connection, lead_id: str) -> Lead | None:
+    """Fetch a single lead by ID. Returns None if not found."""
+    row = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if row is None:
+        return None
+    return _row_to_lead(row)
