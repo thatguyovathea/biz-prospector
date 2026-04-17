@@ -30,6 +30,7 @@ python -m src.pipeline outreach --min-score 55 --metro portland-or
 python -m src.pipeline import-json --input data/raw/leads.json
 python -m src.pipeline export-json --output leads.json --metro portland-or --min-score 55
 python -m src.pipeline stats
+python -m src.pipeline tui
 ```
 
 ## APIs used
@@ -64,7 +65,7 @@ python -m src.pipeline stats
 5. ~~LinkedIn enrichment for employee title analysis~~ ✓
 6. ~~Scheduled/cron pipeline runs~~ ✓
 7. ~~SQLite backend~~ ✓ (replaced JSON files with SQLite via src/db.py)
-8. Web dashboard (optional — Flask/FastAPI for non-CLI users)
+8. ~~Web dashboard~~ ✓ (replaced with Textual TUI dashboard — `python -m src.pipeline tui`)
 
 ## Constraints
 - Settings in config/settings.yaml (copy from settings.example.yaml)

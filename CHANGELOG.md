@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- **TUI dashboard** — Interactive Textual-based terminal dashboard (`python -m src.pipeline tui`) with leads browser, run history, and stats views
 - **SQLite backend** — replaced all JSON file I/O with SQLite database (`data/biz-prospector.db`)
 - Pipeline run tracking (`pipeline_runs` table) with stats command
 - `import-json` and `export-json` CLI commands for data portability

@@ -34,3 +34,11 @@ Living reference of all implemented features.
 - **Scheduled runs** — Cron-based automation with install/list/remove management
 - **Re-enrichment** — Refresh stale leads (older than N days) with updated data
 - **Email summaries** — HTML digest of top leads sent after each scheduled run
+
+## TUI Dashboard
+- **Interactive terminal dashboard** — Textual-based TUI launched via `python -m src.pipeline tui`
+- **Leads browser** — Filterable DataTable with metro/category/min-score filters, side-by-side detail panel
+- **Lead detail panel** — Full enrichment data: score breakdown, website audit, reviews, job postings, employees, contact info
+- **Run history viewer** — Pipeline run history table (F2)
+- **Stats overview** — Dedup stats, lead counts, per-metro/category breakdowns (F3)
+- **Keyboard navigation** — F1/F2/F3 tab switching, q to quit
