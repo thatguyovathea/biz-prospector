@@ -12,7 +12,6 @@ from datetime import datetime, timezone
 
 import httpx
 from rich.console import Console
-from rich.progress import track
 
 from src.config import load_settings, get_api_key
 from src.models import Lead, LeadSource

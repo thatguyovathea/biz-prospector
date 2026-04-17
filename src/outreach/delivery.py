@@ -6,8 +6,6 @@ sending, warmup management, and follow-up automation.
 
 from __future__ import annotations
 
-import json
-
 import httpx
 from rich.console import Console
 
