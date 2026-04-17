@@ -10,6 +10,7 @@ from src.tui.app import BizProspectorApp
 from src.tui.screens import LeadsScreen, RunsScreen, StatsScreen
 from src.tui.widgets import StatusBar
 from tests.conftest import make_lead
+from src.db import get_db, upsert_leads, start_run, finish_run
 
 
 def _mock_get_db(path=None):
@@ -90,3 +91,56 @@ class TestTabSwitching:
             await pilot.press("f3")
             content = app.query_one("#tab-content")
             assert content.query(StatsScreen)
+
+
+class TestIntegration:
+    @pytest.fixture
+    def seeded_db(self):
+        conn = get_db(":memory:")
+        leads = [
+            make_lead(id="lead-001", business_name="Acme HVAC", score=78.5, metro="portland-or", category="HVAC"),
+            make_lead(id="lead-002", business_name="Best Plumbing", score=62.0, metro="portland-or", category="Plumbing"),
+            make_lead(id="lead-003", business_name="City Dental", score=55.0, metro="portland-or", category="Dental"),
+        ]
+        upsert_leads(conn, leads)
+        run_id = start_run(conn, "hvac", "portland-or")
+        finish_run(conn, run_id, {"scraped_count": 3, "enriched_count": 3, "qualified_count": 2})
+        with patch("src.tui.app.get_db", return_value=conn):
+            yield conn
+
+    @pytest.mark.asyncio
+    async def test_integration_leads_screen(self, seeded_db):
+        app = BizProspectorApp()
+        async with app.run_test():
+            leads_screens = app.query(LeadsScreen)
+            assert len(leads_screens) >= 1
+            from textual.widgets import DataTable
+            tables = app.query(DataTable)
+            assert len(tables) >= 1
+            table = tables.first()
+            assert table.row_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_integration_tab_navigation(self, seeded_db):
+        app = BizProspectorApp()
+        async with app.run_test() as pilot:
+            content = app.query_one("#tab-content")
+            assert content.query(LeadsScreen)
+
+            await pilot.press("f2")
+            content = app.query_one("#tab-content")
+            assert content.query(RunsScreen)
+
+            await pilot.press("f3")
+            content = app.query_one("#tab-content")
+            assert content.query(StatsScreen)
+
+            await pilot.press("f1")
+            content = app.query_one("#tab-content")
+            assert content.query(LeadsScreen)
+
+    @pytest.mark.asyncio
+    async def test_integration_quit(self, seeded_db):
+        app = BizProspectorApp()
+        async with app.run_test() as pilot:
+            await pilot.press("q")
