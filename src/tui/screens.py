@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections import Counter
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal
@@ -104,3 +105,117 @@ class LeadsScreen(Static):
             if 0 <= row_idx < len(self._leads):
                 lead = self._leads[row_idx]
                 self.query_one(LeadDetail).show_lead(lead)
+
+
+class RunsScreen(Static):
+    DEFAULT_CSS = """
+    RunsScreen {
+        height: 1fr;
+        width: 1fr;
+        padding: 1;
+    }
+    RunsScreen DataTable {
+        height: 1fr;
+    }
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        super().__init__()
+        self._conn = conn
+
+    def compose(self) -> ComposeResult:
+        yield DataTable(id="runs-table", cursor_type="row")
+
+    def on_mount(self) -> None:
+        table = self.query_one(DataTable)
+        table.add_columns(
+            "ID", "Vertical", "Metro", "Started", "Scraped",
+            "Enriched", "Qualified", "Emailed", "Threshold", "Re-enrich",
+        )
+        self._load_runs()
+
+    def _load_runs(self) -> None:
+        runs = get_run_history(self._conn)
+        table = self.query_one(DataTable)
+        table.clear()
+        for r in runs:
+            started = r["started_at"][:16] if r["started_at"] else "—"
+            table.add_row(
+                str(r["id"]),
+                r["vertical"],
+                r["metro"],
+                started,
+                str(r["scraped_count"] or 0),
+                str(r["enriched_count"] or 0),
+                str(r["qualified_count"] or 0),
+                str(r["emailed_count"] or 0),
+                str(r["threshold"] or "—"),
+                "Yes" if r["is_re_enrich"] else "No",
+            )
+
+
+class StatsScreen(Static):
+    DEFAULT_CSS = """
+    StatsScreen {
+        height: 1fr;
+        width: 1fr;
+        padding: 1;
+        overflow-y: auto;
+    }
+    """
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        super().__init__()
+        self._conn = conn
+
+    def on_mount(self) -> None:
+        self.update(self.render_text())
+
+    def render_text(self) -> str:
+        lines: list[str] = []
+
+        # Dedup stats
+        dedup = get_dedup_stats(self._conn)
+        lines.append("Dedup Stats")
+        lines.append("=" * 35)
+        if dedup:
+            for stage, count in sorted(dedup.items()):
+                lines.append(f"  {stage}: {count} leads processed")
+        else:
+            lines.append("  No dedup records")
+        lines.append("")
+
+        # Aggregate counts
+        all_leads = get_leads(self._conn)
+        scored = [l for l in all_leads if l.score is not None]
+        with_outreach = [l for l in all_leads if l.outreach_email]
+
+        lines.append("Lead Counts")
+        lines.append("=" * 35)
+        lines.append(f"  Total leads: {len(all_leads)}")
+        lines.append(f"  Scored:      {len(scored)}")
+        lines.append(f"  With outreach: {len(with_outreach)}")
+        lines.append("")
+
+        # Per-metro breakdown
+        metro_counts = Counter(l.metro for l in all_leads if l.metro)
+        lines.append("Leads by Metro")
+        lines.append("=" * 35)
+        if metro_counts:
+            for metro, count in metro_counts.most_common():
+                lines.append(f"  {metro}: {count}")
+        else:
+            lines.append("  No metro data")
+        lines.append("")
+
+        # Per-category breakdown
+        cat_counts = Counter(l.category for l in all_leads if l.category)
+        lines.append("Leads by Category")
+        lines.append("=" * 35)
+        if cat_counts:
+            for cat, count in cat_counts.most_common():
+                lines.append(f"  {cat}: {count}")
+        else:
+            lines.append("  No category data")
+
+        return "\n".join(lines)
