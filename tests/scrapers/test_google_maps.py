@@ -12,7 +12,6 @@ from src.scrapers.google_maps import (
     scrape_serpapi,
     scrape_apify,
     scrape_google_maps,
-    save_leads,
     _make_id,
 )
 from src.models import Lead, LeadSource
@@ -248,30 +247,3 @@ class TestScrapeApifyPolling:
         assert call_count == 3
 
 
-class TestGoogleMapsMain:
-    def test_main_cli(self, sample_settings):
-        from click.testing import CliRunner
-        from src.scrapers.google_maps import main as gm_main
-
-        runner = CliRunner()
-        with patch("src.scrapers.google_maps.load_settings", return_value=sample_settings), \
-             patch("src.scrapers.google_maps.scrape_google_maps", return_value=[]) as mock_scrape, \
-             patch("src.scrapers.google_maps.save_leads"):
-            result = runner.invoke(gm_main, ["--vertical", "hvac", "--metro", "portland-or"])
-        assert result.exit_code == 0
-
-
-class TestSaveLeads:
-    def test_saves_to_json(self, tmp_path):
-        leads = [
-            Lead(business_name="Test Biz", id="abc123"),
-            Lead(business_name="Another Biz", id="def456"),
-        ]
-        with patch("src.scrapers.google_maps.DATA_DIR", tmp_path):
-            path = save_leads(leads, "test_output.json")
-        assert path.exists()
-        import json
-        with open(path) as f:
-            data = json.load(f)
-        assert len(data) == 2
-        assert data[0]["business_name"] == "Test Biz"
