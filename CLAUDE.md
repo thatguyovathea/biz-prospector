@@ -59,7 +59,7 @@ python -m src.pipeline tui
 
 ### TODO — priority order:
 1. ~~BuiltWith API integration~~ ✓
-2. ~~Tests~~ ✓ (484 tests)
+2. ~~Tests~~ ✓ (543 tests)
 3. ~~HTML report generator~~ ✓
 4. ~~More verticals~~ ✓ (construction, insurance, accounting, auto repair)
 5. ~~LinkedIn enrichment for employee title analysis~~ ✓
