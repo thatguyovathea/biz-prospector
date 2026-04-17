@@ -488,6 +488,27 @@ class TestImportJsonCommand:
         assert result.exit_code == 0
 
 
+class TestTuiCommand:
+    def test_tui_command_exists(self):
+        assert "tui" in cli.commands
+
+    def test_tui_help(self, runner):
+        result = runner.invoke(cli, ["tui", "--help"])
+        assert result.exit_code == 0
+        assert "TUI" in result.output or "dashboard" in result.output.lower()
+
+    def test_tui_missing_textual(self, runner):
+        with patch("builtins.__import__", side_effect=ImportError("No module named 'textual'")):
+            result = runner.invoke(cli, ["tui"])
+        assert result.exit_code == 1
+
+    def test_tui_launches_app(self, runner):
+        mock_app = MagicMock()
+        with patch.dict("sys.modules", {"src.tui": MagicMock(), "src.tui.app": MagicMock(BizProspectorApp=mock_app)}):
+            result = runner.invoke(cli, ["tui"])
+        mock_app.return_value.run.assert_called_once()
+
+
 class TestExportJsonCommand:
     def test_exports_leads(self, runner, db_with_leads, tmp_path):
         output_file = tmp_path / "export.json"

@@ -517,5 +517,16 @@ def export_json(output_path: str, metro: str | None, category: str | None, min_s
     console.print(f"[green]Exported {len(leads)} leads to {output_path}[/]")
 
 
+@cli.command()
+def tui():
+    """Launch interactive TUI dashboard."""
+    try:
+        from src.tui.app import BizProspectorApp
+    except ImportError:
+        console.print("[red]Textual is not installed. Run: pip install textual[/]")
+        raise SystemExit(1)
+    BizProspectorApp().run()
+
+
 if __name__ == "__main__":
     cli()
