@@ -11,10 +11,11 @@ Linear pipeline with 4 stages, each runnable independently or chained:
 4. **Outreach** (`src/outreach/`) — Claude API generates personalized emails from enrichment data
 
 ## Data flow
-All stages read/write JSON files in `data/` subdirectories. The `Lead` model in `src/models.py` is the shared schema across all stages — it accumulates fields as it flows through the pipeline.
+All stages read/write a SQLite database at `data/biz-prospector.db` via `src/db.py`. The `Lead` model in `src/models.py` is the shared schema across all stages — it accumulates fields as it flows through the pipeline. List/dict fields are stored as JSON text columns. Pipeline runs are tracked in a `pipeline_runs` table.
 
 ## Key files
 - `src/models.py` — Pydantic models (Lead, PipelineConfig, VerticalConfig)
+- `src/db.py` — SQLite storage backend (schema, Lead ↔ row serialization, queries, dedup, run tracking)
 - `src/config.py` — YAML config loader
 - `src/pipeline.py` — CLI entry point and orchestrator (Click-based)
 - `config/settings.example.yaml` — All config including API keys, scoring weights, keyword lists
@@ -23,9 +24,12 @@ All stages read/write JSON files in `data/` subdirectories. The `Lead` model in 
 ```bash
 python -m src.pipeline run --vertical hvac --metro portland-or
 python -m src.pipeline scrape --vertical dental --metro seattle-wa
-python -m src.pipeline enrich --input data/raw/leads.json
-python -m src.pipeline score --input data/raw/leads_enriched.json
-python -m src.pipeline outreach --input data/scored/leads_scored.json
+python -m src.pipeline enrich --metro portland-or
+python -m src.pipeline score --metro portland-or --vertical hvac
+python -m src.pipeline outreach --min-score 55 --metro portland-or
+python -m src.pipeline import-json --input data/raw/leads.json
+python -m src.pipeline export-json --output leads.json --metro portland-or --min-score 55
+python -m src.pipeline stats
 ```
 
 ## APIs used
@@ -54,17 +58,17 @@ python -m src.pipeline outreach --input data/scored/leads_scored.json
 
 ### TODO — priority order:
 1. ~~BuiltWith API integration~~ ✓
-2. ~~Tests~~ ✓ (375 tests, 99% coverage)
+2. ~~Tests~~ ✓ (484 tests)
 3. ~~HTML report generator~~ ✓
 4. ~~More verticals~~ ✓ (construction, insurance, accounting, auto repair)
-5. LinkedIn enrichment for employee title analysis
-6. Scheduled/cron pipeline runs
-7. SQLite or Postgres backend instead of JSON files (for larger scale)
+5. ~~LinkedIn enrichment for employee title analysis~~ ✓
+6. ~~Scheduled/cron pipeline runs~~ ✓
+7. ~~SQLite backend~~ ✓ (replaced JSON files with SQLite via src/db.py)
 8. Web dashboard (optional — Flask/FastAPI for non-CLI users)
 
 ## Constraints
 - Settings in config/settings.yaml (copy from settings.example.yaml)
-- All intermediate data is JSON in data/ subdirs
+- All data stored in SQLite at data/biz-prospector.db (use import-json/export-json for JSON interop)
 - Python 3.11+, dependencies in requirements.txt
 
 ## Solo Orchestrator Framework

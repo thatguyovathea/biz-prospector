@@ -5,6 +5,10 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- **SQLite backend** — replaced all JSON file I/O with SQLite database (`data/biz-prospector.db`)
+- Pipeline run tracking (`pipeline_runs` table) with stats command
+- `import-json` and `export-json` CLI commands for data portability
+- Flexible lead queries by metro, category, score threshold
 - Solo-orchestrator framework adoption (phase-gating, CI pipeline, security scanning)
 - Employee title analysis via Apollo People Search (free endpoint) for scoring
 - Business age scoring from Apollo organization data (founded year)
@@ -12,6 +16,15 @@ All notable changes to this project are documented here.
 - Scheduled pipeline runs via crontab (schedule install/list/remove commands)
 - Re-enrich command for refreshing stale scored leads
 - Email summary notifications after scheduled runs (SMTP, HTML digest with report attachment)
+
+### Changed
+- `enrich`, `score`, `outreach`, `report` commands now use `--metro`/`--category` filters instead of `--input` file paths
+- Dedup tracking moved from JSON files to SQLite `dedup` table
+- `stats` command shows pipeline run history table instead of file counts
+
+### Removed
+- JSON file I/O for lead storage (replaced by SQLite)
+- `save_leads()` standalone function from google_maps scraper
 
 ## [0.1.0] — 2026-04-14 (Retroactive)
 

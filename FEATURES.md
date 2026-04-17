@@ -25,7 +25,9 @@ Living reference of all implemented features.
 
 ## Pipeline
 - **CLI orchestrator** — Click-based, run full pipeline or individual stages
-- **Deduplication** — Track processed leads across pipeline runs
+- **SQLite backend** — All data stored in SQLite (replaced JSON files), pipeline run tracking, flexible lead queries
+- **JSON import/export** — `import-json` and `export-json` commands for data portability
+- **Deduplication** — Track processed leads across pipeline runs (SQLite-backed)
 - **HTML report generation** — Score distributions, top leads, tech stack breakdown, tool gaps
 - **Rate limiting** — Token bucket pattern with configurable per-service limits
 - **Retry logic** — Exponential backoff for all HTTP calls
