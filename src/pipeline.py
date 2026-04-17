@@ -2,13 +2,13 @@
 
 Chains: scrape → enrich → score → generate outreach → save results.
 Can run full pipeline or individual stages.
+All data is persisted via SQLite (see src.db).
 """
 
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone, timedelta
 
 import click
 from rich.console import Console
@@ -16,6 +16,16 @@ from rich.table import Table
 
 from src.config import load_settings, get_scoring_keywords
 from src.models import Lead
+from src.db import (
+    get_db,
+    upsert_leads,
+    get_leads,
+    get_stale_leads,
+    start_run,
+    finish_run,
+    get_run_history,
+    get_dedup_stats,
+)
 from src.scrapers.google_maps import scrape_google_maps
 from src.enrichment.website_audit import audit_website, enrich_lead_with_audit
 from src.scrapers.reviews import (
@@ -32,31 +42,17 @@ from src.scoring.score import score_leads
 from src.outreach.generate import generate_batch_outreach
 from src.outreach.delivery import push_to_instantly
 from src.enrichment.async_processor import run_async_enrichment
-from src.dedup import filter_new_leads, mark_processed, get_stats
+from src.dedup import filter_new_leads, mark_processed
 from src.reporting.html_report import save_report
 from src.notifications.email_summary import send_run_summary
 from src.scheduler import install_jobs, list_jobs, remove_jobs
 
 console = Console()
-DATA_DIR = Path("data")
 
 
-def _load_leads(path: str) -> list[Lead]:
-    """Load leads from a JSON file."""
-    with open(path) as f:
-        data = json.load(f)
-    return [Lead(**item) for item in data]
-
-
-def _save_json(leads: list[Lead], subdir: str, filename: str) -> Path:
-    """Save leads to a JSON file in the specified data subdirectory."""
-    out_dir = DATA_DIR / subdir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / filename
-    with open(path, "w") as f:
-        json.dump([l.model_dump(mode="json") for l in leads], f, indent=2)
-    console.print(f"[green]Saved {len(leads)} leads to {path}[/]")
-    return path
+def _get_conn():
+    """Return a database connection. Extracted for test patching."""
+    return get_db()
 
 
 def _print_top_leads(leads: list[Lead], n: int = 10):
@@ -99,17 +95,25 @@ def cli():
 @click.option("--provider", default="serpapi", type=click.Choice(["serpapi", "apify"]))
 def scrape(vertical: str, metro: str, count: int, provider: str):
     """Stage 1: Scrape business listings from Google Maps."""
+    conn = _get_conn()
     leads = scrape_google_maps(vertical, metro, count, provider)
-    slug = f"{vertical}_{metro}_{datetime.now().strftime('%Y%m%d')}"
-    _save_json(leads, "raw", f"{slug}.json")
+    upsert_leads(conn, leads)
+    console.print(f"[green]Saved {len(leads)} leads to database[/]")
 
 
 @cli.command()
-@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
-def enrich(input_path: str):
+@click.option("--metro", default=None, help="Filter leads by metro area")
+@click.option("--category", default=None, help="Filter leads by category")
+def enrich(metro: str | None, category: str | None):
     """Stage 2: Enrich leads with website audit, reviews, and job postings."""
+    conn = _get_conn()
     settings = load_settings()
-    leads = _load_leads(input_path)
+    leads = get_leads(conn, metro=metro, category=category)
+
+    if not leads:
+        console.print("[yellow]No leads found matching filters.[/]")
+        return
+
     console.print(f"[bold]Enriching {len(leads)} leads[/]")
 
     kw = get_scoring_keywords(settings)
@@ -149,18 +153,25 @@ def enrich(input_path: str):
         except Exception as e:
             console.print(f"    [yellow]Job search failed: {e}[/]")
 
-    slug = Path(input_path).stem + "_enriched"
-    _save_json(leads, "raw", f"{slug}.json")
+    upsert_leads(conn, leads)
+    console.print(f"[green]Enriched {len(leads)} leads in database[/]")
 
 
 @cli.command()
-@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
+@click.option("--metro", default=None, help="Filter leads by metro area")
+@click.option("--category", default=None, help="Filter leads by category")
 @click.option("--vertical", default=None)
 @click.option("--threshold", default=None, type=float)
-def score(input_path: str, vertical: str | None, threshold: float | None):
+def score(metro: str | None, category: str | None, vertical: str | None, threshold: float | None):
     """Stage 3: Score enriched leads."""
+    conn = _get_conn()
     settings = load_settings()
-    leads = _load_leads(input_path)
+    leads = get_leads(conn, metro=metro, category=category)
+
+    if not leads:
+        console.print("[yellow]No leads found matching filters.[/]")
+        return
+
     scored = score_leads(leads, vertical)
 
     # Apply threshold
@@ -173,19 +184,26 @@ def score(input_path: str, vertical: str | None, threshold: float | None):
     )
     _print_top_leads(qualified)
 
-    slug = Path(input_path).stem.replace("_enriched", "") + "_scored"
-    _save_json(qualified, "scored", f"{slug}.json")
+    upsert_leads(conn, scored)
+    console.print(f"[green]Scored {len(scored)} leads in database[/]")
 
 
 @cli.command()
-@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
-def outreach(input_path: str):
+@click.option("--min-score", default=None, type=float, help="Minimum score threshold")
+@click.option("--metro", default=None, help="Filter leads by metro area")
+@click.option("--category", default=None, help="Filter leads by category")
+def outreach(min_score: float | None, metro: str | None, category: str | None):
     """Stage 4: Generate personalized outreach emails."""
-    leads = _load_leads(input_path)
-    results = generate_batch_outreach(leads)
+    conn = _get_conn()
+    leads = get_leads(conn, metro=metro, category=category, min_score=min_score, scored_only=True)
 
-    slug = Path(input_path).stem.replace("_scored", "") + "_outreach"
-    _save_json(results, "outreach", f"{slug}.json")
+    if not leads:
+        console.print("[yellow]No scored leads found matching filters.[/]")
+        return
+
+    results = generate_batch_outreach(leads)
+    upsert_leads(conn, results)
+    console.print(f"[green]Generated outreach for {len(results)} leads in database[/]")
 
 
 @cli.command()
@@ -208,15 +226,18 @@ def run(
     notify: bool,
 ):
     """Run the full pipeline: scrape → enrich → score → outreach → [deliver]."""
+    conn = _get_conn()
     settings = load_settings()
     timestamp = datetime.now().strftime("%Y%m%d")
-    slug = f"{vertical}_{metro}_{timestamp}"
+
+    threshold = settings.get("pipeline", {}).get("score_threshold", 55)
+    run_id = start_run(conn, vertical, metro, threshold=threshold)
 
     # Stage 1: Scrape
     console.rule("[bold blue]Stage 1: Scraping")
     leads = scrape_google_maps(vertical, metro, count, provider)
     scraped_count = len(leads)
-    _save_json(leads, "raw", f"{slug}.json")
+    upsert_leads(conn, leads, run_id=run_id)
 
     # Dedup against previous runs
     if not skip_dedup:
@@ -226,30 +247,35 @@ def run(
 
     if not leads:
         console.print("[yellow]No new leads to process.[/]")
+        finish_run(conn, run_id, {"scraped_count": scraped_count})
         return
 
     # Stage 2: Enrich (async)
     console.rule("[bold blue]Stage 2: Enriching")
     leads = run_async_enrichment(leads, max_concurrent=concurrent)
     mark_processed(leads, "enrich")
-    _save_json(leads, "raw", f"{slug}_enriched.json")
+    upsert_leads(conn, leads, run_id=run_id)
 
     # Stage 3: Score
     console.rule("[bold blue]Stage 3: Scoring")
     scored = score_leads(leads, vertical)
-    threshold = settings.get("pipeline", {}).get("score_threshold", 55)
     qualified = [l for l in scored if (l.score or 0) >= threshold]
     _print_top_leads(qualified)
-    _save_json(qualified, "scored", f"{slug}_scored.json")
+    upsert_leads(conn, qualified, run_id=run_id)
 
     if not qualified:
         console.print("[yellow]No leads above threshold.[/]")
+        finish_run(conn, run_id, {
+            "scraped_count": scraped_count,
+            "enriched_count": len(leads),
+            "qualified_count": 0,
+        })
         return
 
     # Stage 4: Outreach
     console.rule("[bold blue]Stage 4: Generating Outreach")
     results = generate_batch_outreach(qualified)
-    _save_json(results, "outreach", f"{slug}_outreach.json")
+    upsert_leads(conn, results, run_id=run_id)
 
     # Stage 5: Delivery (optional)
     if push_instantly:
@@ -272,6 +298,15 @@ def run(
     )
     console.print(f"  Report: {report_path}")
 
+    # Finalize run
+    emailed_count = sum(1 for l in results if l.outreach_email)
+    finish_run(conn, run_id, {
+        "scraped_count": scraped_count,
+        "enriched_count": len(leads),
+        "qualified_count": len(qualified),
+        "emailed_count": emailed_count,
+    })
+
     # Email notification (for scheduled runs)
     if notify:
         run_info = {
@@ -288,38 +323,74 @@ def run(
     console.rule("[bold green]Pipeline Complete")
     console.print(
         f"Scraped {scraped_count} → Qualified {len(qualified)} → "
-        f"Emails generated for {sum(1 for l in results if l.outreach_email)}"
+        f"Emails generated for {emailed_count}"
     )
 
 
 @cli.command()
-@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
-@click.option("--vertical", default="")
-@click.option("--metro", default="")
+@click.option("--metro", default=None, help="Filter leads by metro area")
+@click.option("--category", default=None, help="Filter leads by category")
+@click.option("--vertical", default="", help="Vertical name for report title")
 @click.option("--output", "output_path", default="", help="Output HTML filename")
-def report(input_path: str, vertical: str, metro: str, output_path: str):
+def report(metro: str | None, category: str | None, vertical: str, output_path: str):
     """Generate an HTML report from scored/outreach leads."""
-    leads = _load_leads(input_path)
-    title = f"{vertical} {metro} Report".strip() if vertical or metro else "Pipeline Run Report"
+    conn = _get_conn()
+    leads = get_leads(conn, metro=metro, category=category, scored_only=True)
+
+    if not leads:
+        console.print("[yellow]No scored leads found matching filters.[/]")
+        return
+
+    metro_label = metro or ""
+    title = f"{vertical} {metro_label} Report".strip() if vertical or metro_label else "Pipeline Run Report"
     path = save_report(
         leads,
         filename=output_path,
         title=title,
         vertical=vertical,
-        metro=metro,
+        metro=metro_label,
     )
     console.print(f"[green]Report saved to {path}[/]")
 
 
 @cli.command()
 def stats():
-    """Show dedup stats across pipeline stages."""
-    s = get_stats()
-    if not s:
-        console.print("No leads processed yet.")
-        return
-    for stage, count in s.items():
-        console.print(f"  {stage}: {count} leads processed")
+    """Show pipeline run history and dedup stats."""
+    conn = _get_conn()
+
+    # Run history
+    runs = get_run_history(conn)
+    if runs:
+        run_table = Table(title="Pipeline Run History")
+        run_table.add_column("ID", justify="right")
+        run_table.add_column("Vertical")
+        run_table.add_column("Metro")
+        run_table.add_column("Started")
+        run_table.add_column("Scraped", justify="right")
+        run_table.add_column("Enriched", justify="right")
+        run_table.add_column("Qualified", justify="right")
+        run_table.add_column("Emailed", justify="right")
+        for r in runs:
+            run_table.add_row(
+                str(r["id"]),
+                r["vertical"],
+                r["metro"],
+                r["started_at"][:16] if r["started_at"] else "—",
+                str(r["scraped_count"] or 0),
+                str(r["enriched_count"] or 0),
+                str(r["qualified_count"] or 0),
+                str(r["emailed_count"] or 0),
+            )
+        console.print(run_table)
+    else:
+        console.print("No pipeline runs recorded yet.")
+
+    # Dedup stats
+    dedup = get_dedup_stats(conn)
+    if dedup:
+        console.print("\n[bold]Dedup Stats:[/]")
+        for stage, count in dedup.items():
+            console.print(f"  {stage}: {count} leads processed")
 
 
 @cli.command(name="re-enrich")
@@ -327,59 +398,35 @@ def stats():
 @click.option("--notify", is_flag=True, help="Send summary email after completion")
 def re_enrich(max_age: int | None, notify: bool):
     """Re-enrich and re-score stale leads."""
+    conn = _get_conn()
     settings = load_settings()
     max_age_days = max_age or settings.get("schedule", {}).get(
         "re_enrich", {}
     ).get("max_age_days", 30)
 
-    scored_dir = DATA_DIR / "scored"
-    if not scored_dir.exists():
-        console.print("[yellow]No scored leads directory found.[/]")
-        return
-
-    # Load all scored leads grouped by source file
-    from datetime import timezone, timedelta
-
     cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
-    stale_by_file: dict[Path, list[Lead]] = {}
+    stale = get_stale_leads(conn, cutoff)
 
-    for json_file in sorted(scored_dir.glob("*.json")):
-        leads = _load_leads(str(json_file))
-        stale = []
-        for lead in leads:
-            if lead.enriched_at:
-                if isinstance(lead.enriched_at, str):
-                    enriched_dt = datetime.fromisoformat(lead.enriched_at)
-                else:
-                    enriched_dt = lead.enriched_at
-                if enriched_dt.tzinfo is None:
-                    enriched_dt = enriched_dt.replace(tzinfo=timezone.utc)
-                if enriched_dt < cutoff:
-                    stale.append(lead)
-            else:
-                stale.append(lead)
-        if stale:
-            stale_by_file[json_file] = stale
-
-    total_stale = sum(len(v) for v in stale_by_file.values())
-    if total_stale == 0:
+    if not stale:
         console.print("[yellow]No stale leads to re-enrich.[/]")
         return
 
-    console.print(f"[bold]Re-enriching {total_stale} stale leads from {len(stale_by_file)} files[/]")
+    console.print(f"[bold]Re-enriching {len(stale)} stale leads[/]")
 
-    all_refreshed = []
-    for json_file, stale_leads in stale_by_file.items():
-        console.rule(f"[blue]{json_file.name}")
-        enriched = run_async_enrichment(stale_leads)
-        scored = score_leads(enriched)
-        all_refreshed.extend(scored)
+    run_id = start_run(conn, "all", "all", is_re_enrich=True)
 
-        # Save back to source file
-        _save_json(scored, "scored", json_file.name)
+    enriched = run_async_enrichment(stale)
+    scored = score_leads(enriched)
+    upsert_leads(conn, scored, run_id=run_id)
+
+    finish_run(conn, run_id, {
+        "scraped_count": 0,
+        "enriched_count": len(enriched),
+        "qualified_count": len(scored),
+    })
 
     console.rule("[bold green]Re-enrichment Complete")
-    console.print(f"Refreshed {len(all_refreshed)} leads")
+    console.print(f"Refreshed {len(scored)} leads")
 
     if notify:
         run_info = {
@@ -387,11 +434,11 @@ def re_enrich(max_age: int | None, notify: bool):
             "metro": "all",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "scraped_count": 0,
-            "qualified_count": len(all_refreshed),
+            "qualified_count": len(scored),
             "threshold": settings.get("pipeline", {}).get("score_threshold", 55),
             "is_re_enrich": True,
         }
-        send_run_summary(all_refreshed, run_info, settings)
+        send_run_summary(scored, run_info, settings)
 
 
 @cli.group()
@@ -442,6 +489,32 @@ def schedule_remove():
         console.print(f"[green]Removed {count} scheduled job(s)[/]")
     else:
         console.print("No scheduled jobs to remove.")
+
+
+@cli.command(name="import-json")
+@click.option("--input", "input_path", required=True, type=click.Path(exists=True))
+def import_json(input_path: str):
+    """Import leads from a JSON file into the database."""
+    with open(input_path) as f:
+        data = json.load(f)
+    leads = [Lead(**item) for item in data]
+    conn = _get_conn()
+    count = upsert_leads(conn, leads)
+    console.print(f"[green]Imported {count} leads from {input_path}[/]")
+
+
+@cli.command(name="export-json")
+@click.option("--output", "output_path", required=True, type=click.Path())
+@click.option("--metro", default=None)
+@click.option("--category", default=None)
+@click.option("--min-score", default=None, type=float)
+def export_json(output_path: str, metro: str | None, category: str | None, min_score: float | None):
+    """Export leads from the database to a JSON file."""
+    conn = _get_conn()
+    leads = get_leads(conn, metro=metro, category=category, min_score=min_score)
+    with open(output_path, "w") as f:
+        json.dump([l.model_dump(mode="json") for l in leads], f, indent=2)
+    console.print(f"[green]Exported {len(leads)} leads to {output_path}[/]")
 
 
 if __name__ == "__main__":

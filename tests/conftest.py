@@ -128,16 +128,6 @@ def sample_vertical_config():
     }
 
 
-@pytest.fixture
-def tmp_data_dir(tmp_path):
-    """Create an isolated temp data directory structure."""
-    dedup_dir = tmp_path / "data" / ".dedup"
-    dedup_dir.mkdir(parents=True)
-    raw_dir = tmp_path / "data" / "raw"
-    raw_dir.mkdir(parents=True)
-    return tmp_path
-
-
 def build_html(
     techs: list[str] | None = None,
     has_crm: str | None = None,

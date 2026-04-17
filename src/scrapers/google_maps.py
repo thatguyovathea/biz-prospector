@@ -6,13 +6,10 @@ Outputs raw Lead objects with basic info populated.
 
 from __future__ import annotations
 
-import json
 import hashlib
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
-import click
 import httpx
 from rich.console import Console
 from rich.progress import track
@@ -21,7 +18,6 @@ from src.config import load_settings, get_api_key
 from src.models import Lead, LeadSource
 
 console = Console()
-DATA_DIR = Path("data/raw")
 
 
 def scrape_serpapi(
@@ -208,26 +204,3 @@ def scrape_google_maps(
     return unique
 
 
-def save_leads(leads: list[Lead], filename: str) -> Path:
-    """Save leads to JSON file in data/raw/."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    path = DATA_DIR / filename
-    with open(path, "w") as f:
-        json.dump([l.model_dump(mode="json") for l in leads], f, indent=2)
-    console.print(f"[green]Saved {len(leads)} leads to {path}[/]")
-    return path
-
-
-@click.command()
-@click.option("--vertical", required=True, help="Business vertical (e.g., hvac, dental, legal)")
-@click.option("--metro", required=True, help="Metro area (e.g., portland-or, seattle-wa)")
-@click.option("--count", default=100, help="Number of results to fetch")
-@click.option("--provider", default="serpapi", type=click.Choice(["serpapi", "apify"]))
-def main(vertical: str, metro: str, count: int, provider: str):
-    leads = scrape_google_maps(vertical, metro, count, provider)
-    slug = f"{vertical}_{metro}_{datetime.now().strftime('%Y%m%d')}"
-    save_leads(leads, f"{slug}.json")
-
-
-if __name__ == "__main__":
-    main()
