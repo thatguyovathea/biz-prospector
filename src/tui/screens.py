@@ -9,7 +9,7 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import DataTable, Static
 
-from src.db import get_leads, get_lead, get_run_history, get_dedup_stats
+from src.db import get_leads, get_run_history, get_dedup_stats
 from src.models import Lead
 from src.tui.widgets import FilterBar, LeadDetail
 
@@ -79,7 +79,7 @@ class LeadsScreen(Static):
         table.add_columns("Business Name", "Score", "Metro", "Category")
         self._load_leads()
 
-    def _load_leads(self, metro=None, category=None, min_score=None) -> None:
+    def _load_leads(self, metro: str | None = None, category: str | None = None, min_score: float | None = None) -> None:
         all_leads = get_leads(self._conn)
         self._all_leads_count = len(all_leads)
         self._leads = get_leads(self._conn, metro=metro, category=category, min_score=min_score)
@@ -101,9 +101,9 @@ class LeadsScreen(Static):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if event.row_key and event.row_key.value is not None:
-            row_idx = event.cursor_row
-            if 0 <= row_idx < len(self._leads):
-                lead = self._leads[row_idx]
+            lead_id = event.row_key.value
+            lead = next((l for l in self._leads if l.id == lead_id), None)
+            if lead:
                 self.query_one(LeadDetail).show_lead(lead)
 
 

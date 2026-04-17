@@ -101,11 +101,15 @@ class FilterBar(Static):
         metro_val = self.query_one("#filter-metro", Input).value.strip()
         cat_val = self.query_one("#filter-category", Input).value.strip()
         score_val = self.query_one("#filter-score", Input).value.strip()
+        try:
+            min_score = float(score_val) if score_val else None
+        except ValueError:
+            min_score = None
         self.post_message(
             self.Applied(
                 metro=metro_val or None,
                 category=cat_val or None,
-                min_score=float(score_val) if score_val else None,
+                min_score=min_score,
             )
         )
 
@@ -183,7 +187,7 @@ class LeadDetail(Static):
         lines.append(f"Chat Widget:      {_bool_display(lead.has_chat_widget)}")
         lines.append(f"Scheduling:       {_bool_display(lead.has_scheduling)}")
         lines.append(f"SSL:              {_bool_display(lead.has_ssl)}")
-        lines.append(f"Mobile Responsive:{_bool_display(lead.is_mobile_responsive)}")
+        lines.append(f"Mobile Responsive: {_bool_display(lead.is_mobile_responsive)}")
         if lead.page_speed_score is not None:
             lines.append(f"Page Speed:       {lead.page_speed_score}")
         else:
